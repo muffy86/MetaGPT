@@ -106,6 +106,16 @@ class Config(CLIParams, YamlModel):
             return None
         return Config.from_yaml_file(pathname)
 
+    @staticmethod
+    def user_config_path() -> Path:
+        """Absolute path to the active user configuration."""
+        return CONFIG_ROOT / "config2.yaml"
+
+    @staticmethod
+    def example_config_path() -> Path:
+        """Absolute path to the shipped reference configuration."""
+        return METAGPT_ROOT / "config/config2.example.yaml"
+
     @classmethod
     def default(cls, reload: bool = False, **kwargs) -> "Config":
         """Load default config
@@ -168,6 +178,24 @@ class Config(CLIParams, YamlModel):
         if self.llm.api_type == LLMType.AZURE:
             return self.llm
         return None
+
+    def diagnostics(self) -> list[str]:
+        """Collect human-readable warnings for common misconfigurations."""
+        warnings: list[str] = []
+
+        if not self.llm.api_key or self.llm.api_key.strip() in {"", "YOUR_API_KEY"}:
+            warnings.append("llm.api_key is empty or still set to the placeholder; outbound LLM calls will fail.")
+
+        if not self.llm.model or self.llm.model.strip() == "":
+            warnings.append("llm.model is not configured; MetaGPT cannot choose a default completion model.")
+
+        if self.inc and not self.project_path:
+            warnings.append("Incremental mode (inc) is enabled but project_path is not provided.")
+
+        if self.project_path and not Path(self.project_path).expanduser().exists():
+            warnings.append(f"Configured project_path '{self.project_path}' does not exist on disk.")
+
+        return warnings
 
 
 def merge_dict(dicts: Iterable[Dict]) -> Dict:

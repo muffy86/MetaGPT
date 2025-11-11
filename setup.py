@@ -44,6 +44,14 @@ extras_require = {
         "llama-index-postprocessor-colbert-rerank==0.1.1",
         "llama-index-postprocessor-flag-embedding-reranker==0.1.2",
         "docx2txt==0.8",
+        "faiss_cpu==1.7.4",
+        "lancedb==0.4.0",
+        "meilisearch==0.21.0",
+        "qdrant-client==1.7.0",
+        "semantic-kernel==0.4.3.dev0",
+        "google-generativeai==0.4.1",
+        "rank-bm25==0.2.2",
+        "jieba==0.42.1",
     ],
 }
 
@@ -69,6 +77,19 @@ extras_require["test"] = [
 extras_require["pyppeteer"] = [
     "pyppeteer>=1.0.2"
 ]  # pyppeteer is unmaintained and there are conflicts with dependencies
+
+extras_require["browser"] = [
+    "playwright>=1.26",
+    "curl-cffi~=0.7.0",
+    "websockets>=10.0,<12.0",
+    "websocket-client~=1.8.0",
+]
+
+extras_require["tts"] = [
+    "spark_ai_python~=0.3.30",
+    "azure-cognitiveservices-speech~=1.31.0",
+]
+
 extras_require["dev"] = (["pylint~=3.0.3", "black~=23.3.0", "isort~=5.12.0", "pre-commit~=3.6.0"],)
 extras_require["android_assistant"] = [
     "pyshine==0.0.9",

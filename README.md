@@ -51,13 +51,26 @@
 
 ### Installation
 
-> Ensure that Python 3.9 or later, but less than 3.12, is installed on your system. You can check this by using: `python --version`.  
+> MetaGPT is validated on CPython 3.9, 3.10, and 3.11. Ensure that a Python interpreter within this range is active (check with `python --version`) before installing.  
 > You can use conda like this: `conda create -n metagpt python=3.9 && conda activate metagpt`
 
 ```bash
 pip install --upgrade metagpt
 # or `pip install --upgrade git+https://github.com/geekan/MetaGPT.git`
 # or `git clone https://github.com/geekan/MetaGPT && cd MetaGPT && pip install --upgrade -e .`
+```
+
+Optional capability bundles are shipped as Python extras:
+
+```bash
+# Vector stores & retrieval augmented generation helpers
+pip install "metagpt[rag]"
+
+# Web automation & scraping helpers
+pip install "metagpt[browser]"
+
+# Speech synthesis connectors
+pip install "metagpt[tts]"
 ```
 
 **Install [node](https://nodejs.org/en/download) and [pnpm](https://pnpm.io/installation#using-npm) before actual use.**

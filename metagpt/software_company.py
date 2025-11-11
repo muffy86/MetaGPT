@@ -2,10 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import difflib
 from pathlib import Path
 
 import typer
 
+from metagpt.config2 import Config
 from metagpt.const import CONFIG_ROOT
 
 app = typer.Typer(add_completion=False, pretty_exceptions_show_locals=False)
@@ -151,6 +153,64 @@ def copy_config_to():
     # 复制文件
     target_path.write_text(DEFAULT_CONFIG, encoding="utf-8")
     print(f"Configuration file initialized at {target_path}")
+
+
+@app.command("config-check", help="Validate the active config and compare it with the reference example.")
+def config_check(
+    example: Path = typer.Option(
+        None, "--example", "-e", help="Optional path to the example config. Defaults to config/config2.example.yaml."
+    ),
+    active: Path = typer.Option(
+        None, "--active", "-a", help="Optional path to the active config. Defaults to ~/.metagpt/config2.yaml."
+    ),
+    fail_on_warning: bool = typer.Option(
+        False, "--fail-on-warning", help="Exit with code 1 when diagnostics report warnings."
+    ),
+):
+    """Surface configuration diagnostics and highlight drift from the shipped example file."""
+
+    cfg = Config.default(reload=True)
+    issues = cfg.diagnostics()
+
+    if issues:
+        typer.echo("Configuration diagnostics found potential issues:")
+        for issue in issues:
+            typer.echo(f"- {issue}")
+    else:
+        typer.echo("Configuration diagnostics: no issues detected.")
+
+    example_path = example or Config.example_config_path()
+    active_path = active or Config.user_config_path()
+
+    if not example_path.exists():
+        typer.echo(f"Reference example config not found at {example_path}")
+    else:
+        example_lines = example_path.read_text(encoding="utf-8").splitlines()
+        if not active_path.exists():
+            typer.echo(f"Active config not found at {active_path}. Run `metagpt --init-config` to scaffold it.")
+            active_lines: list[str] = []
+        else:
+            active_lines = active_path.read_text(encoding="utf-8").splitlines()
+
+        diff = list(
+            difflib.unified_diff(
+                example_lines,
+                active_lines,
+                fromfile=str(example_path),
+                tofile=str(active_path if active_lines else active_path),
+                lineterm="",
+            )
+        )
+
+        if diff:
+            typer.echo("Diff against example configuration:")
+            for line in diff:
+                typer.echo(line)
+        elif active_lines:
+            typer.echo("Active config matches the reference example.")
+
+    if issues and fail_on_warning:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
