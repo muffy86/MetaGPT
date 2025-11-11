@@ -21,6 +21,7 @@ from typing import Optional
 from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from metagpt.actions.add_requirement import UserRequirement
+from metagpt.const import MESSAGE_ROUTE_TO_ALL
 from metagpt.environment.stanford_town.env_space import (
     EnvAction,
     EnvActionType,
@@ -90,6 +91,26 @@ class STRole(Role):
     def check_start_time(cls, start_time: str) -> datetime:
         return datetime.strptime(f"{start_time}, 00:00:00", "%B %d, %Y, %H:%M:%S")
 
+    class StanfordTownConversationMessage(Message):
+        content: str = ""
+        cause_by: str = "StanfordTownConversation"
+
+        @classmethod
+        def from_conversation(
+            cls, summary: str, participants: list[str], transcript: list[list[str]], duration_minutes: int
+        ) -> "STRole.StanfordTownConversationMessage":
+            recipients = set(participants or [MESSAGE_ROUTE_TO_ALL])
+            metadata = {
+                "participants": participants,
+                "transcript": transcript,
+                "duration_minutes": duration_minutes,
+            }
+            return cls(content=summary, metadata=metadata, send_to=recipients)
+
+    class EnvironmentUpdateFailedMessage(Message):
+        content: str = "Failed to sync environment state"
+        cause_by: str = "StanfordTownEnvironmentUpdate"
+
     @model_validator(mode="after")
     def validate_st_role_after(self):
         self.role_storage_path = STORAGE_PATH.joinpath(f"{self.sim_code}/personas/{self.name}")
@@ -98,11 +119,10 @@ class STRole(Role):
 
         self.set_actions([])
 
+        watch_targets = ["StanfordTownConversation", DummyAction]
         if self.has_inner_voice:
-            # TODO add communication action
-            self._watch([UserRequirement, DummyAction])
-        else:
-            self._watch([DummyAction])
+            watch_targets.insert(0, UserRequirement)
+        self._watch(watch_targets)
 
     async def init_curr_tile(self):
         # init role
@@ -582,9 +602,12 @@ class STRole(Role):
         # update role env
         ret = await self.update_role_env()
         if not ret:
-            # TODO add message
             logger.info(f"Role: {self.name} update_role_env return False")
-            return DummyMessage()
+            return self.EnvironmentUpdateFailedMessage(
+                content=f"Failed to synchronize environment state for {self.name}",
+                metadata={"role": self.name, "step": self.step},
+                send_to={self.name},
+            )
 
         new_day = False
         if not self.scratch.curr_time or self.inner_voice:

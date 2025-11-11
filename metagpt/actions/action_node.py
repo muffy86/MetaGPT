@@ -366,9 +366,51 @@ class ActionNode:
         text = self.compile_to(nodes, schema, kv_sep)
         return self.tagging(text, schema, tag)
 
+    @staticmethod
+    def _type_to_name(expected_type: Type) -> str:
+        """Return a human readable representation for typing constructs."""
+        origin = typing.get_origin(expected_type)
+        if origin:
+            origin_name = getattr(origin, "__name__", str(origin)).replace("typing.", "")
+            args = typing.get_args(expected_type)
+            if args:
+                args_repr = ", ".join(ActionNode._type_to_name(arg) for arg in args)
+                return f"{origin_name}[{args_repr}]"
+            return origin_name
+        if isinstance(expected_type, type):
+            return expected_type.__name__
+        return str(expected_type).replace("typing.", "")
+
+    def _serialize_instruction_nodes(self, nodes: Union["ActionNode", Dict]) -> Union[Dict, str]:
+        if isinstance(nodes, dict):
+            return {k: self._serialize_instruction_nodes(v) for k, v in nodes.items()}
+        if isinstance(nodes, ActionNode):
+            payload = {
+                "type": self._type_to_name(nodes.expected_type),
+                "instruction": nodes.instruction,
+            }
+            if nodes.example is not None:
+                payload["example"] = nodes.example
+            if nodes.children:
+                payload["children"] = {
+                    key: self._serialize_instruction_nodes(child)
+                    for key, child in nodes.children.items()
+                }
+            return payload
+        return nodes
+
+    def _compile_instruction_json(self, mode="children", tag="", exclude=None) -> str:
+        exclude = exclude or []
+        raw_nodes = self._to_dict(format_func=lambda node: node, mode=mode, exclude=exclude)
+        instruction_tree = self._serialize_instruction_nodes(raw_nodes)
+        text = json.dumps(instruction_tree, indent=4, ensure_ascii=False)
+        return self.tagging(text, schema="json", tag=tag)
+
     def compile_instruction(self, schema="markdown", mode="children", tag="", exclude=None) -> str:
         """compile to raw/json/markdown template with all/root/children nodes"""
-        format_func = lambda i: f"{i.expected_type}  # {i.instruction}"
+        if schema == "json":
+            return self._compile_instruction_json(mode=mode, tag=tag, exclude=exclude)
+        format_func = lambda i: f"{self._type_to_name(i.expected_type)}  # {i.instruction}"
         return self._compile_f(schema, mode, tag, format_func, kv_sep=": ", exclude=exclude)
 
     def compile_example(self, schema="json", mode="children", tag="", exclude=None) -> str:
@@ -404,9 +446,8 @@ class ActionNode:
         # instruction = node_schema
         # example = json.dumps(defaults, indent=4)
 
-        # FIXME: json instruction会带来格式问题，如："Project name": "web_2048  # 项目名称使用下划线",
-        # compile example暂时不支持markdown
-        instruction = self.compile_instruction(schema="markdown", mode=mode, exclude=exclude)
+        instruction_schema = "json" if schema == "json" else "markdown"
+        instruction = self.compile_instruction(schema=instruction_schema, mode=mode, exclude=exclude)
         example = self.compile_example(schema=schema, tag=TAG, mode=mode, exclude=exclude)
         # nodes = ", ".join(self.to_dict(mode=mode).keys())
         constraints = [LANGUAGE_CONSTRAINT, FORMAT_CONSTRAINT]

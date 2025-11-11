@@ -1,4 +1,5 @@
 """Setup script for MetaGPT."""
+import os
 import subprocess
 from pathlib import Path
 
@@ -95,9 +96,11 @@ extras_require["android_assistant"] = [
     "clip-openai",
 ]
 
+package_version = os.environ.get("METAGPT_VERSION", "1.0.0")
+
 setup(
     name="metagpt",
-    version="1.0.0",
+    version=package_version,
     description="The Multi-Agent Framework",
     long_description=long_description,
     long_description_content_type="text/markdown",
