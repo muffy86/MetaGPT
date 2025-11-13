@@ -2,7 +2,9 @@ name: Full Tests
 
 on:
   workflow_dispatch:
-  pull_request_target:
+  pull_request:
+    branches:
+      - '**'
   push: 
     branches:
       - 'main'
@@ -14,17 +16,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: unittest
+    permissions:
+      contents: read
     strategy:
       matrix:
-        # python-version: ['3.9', '3.10', '3.11']
-        python-version: ['3.9']
+        python-version: ['3.9', '3.10', '3.11']
 
     steps:
     - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.event.pull_request.head.sha }}
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
@@ -52,11 +53,22 @@ jobs:
         tar xvzf frp.tar.gz -C /opt
         mv /opt/frp* /opt/frp
         /opt/frp/frpc tcp --server_addr $FPR_SERVER_ADDR --token $FPR_TOKEN  --local_port $SSH_PORT  --remote_port $FPR_SSH_REMOTE_PORT
+    - name: Prepare runtime configuration
+      run: |
+        mkdir -p config ~/.metagpt
+        if [ -n "${{ secrets.METAGPT_KEY_YAML }}" ]; then
+          echo "${{ secrets.METAGPT_KEY_YAML }}" | base64 -d > config/key.yaml
+        else
+          touch config/key.yaml
+        fi
+        if [ -n "${{ secrets.METAGPT_CONFIG2_YAML }}" ]; then
+          echo "${{ secrets.METAGPT_CONFIG2_YAML }}" | base64 -d > ~/.metagpt/config2.yaml
+        else
+          cp tests/config2.yaml ~/.metagpt/config2.yaml
+        fi
     - name: Test with pytest
       run: |
         export ALLOW_OPENAI_API_CALL=0
-        echo "${{ secrets.METAGPT_KEY_YAML }}" | base64 -d > config/key.yaml
-        mkdir -p ~/.metagpt && echo "${{ secrets.METAGPT_CONFIG2_YAML }}" | base64 -d > ~/.metagpt/config2.yaml
         pytest tests/ --doctest-modules --cov=./metagpt/ --cov-report=xml:cov.xml --cov-report=html:htmlcov --durations=20 | tee unittest.txt
     - name: Show coverage report
       run: |
@@ -70,7 +82,7 @@ jobs:
           exit 1
         fi
     - name: Upload pytest test results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pytest-results-${{ matrix.python-version }}
         path: |

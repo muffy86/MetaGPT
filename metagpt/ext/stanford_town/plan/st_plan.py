@@ -253,6 +253,14 @@ async def _chat_react(role: "STRole", reaction_mode: str, roles: dict["STRole"])
     inserted_act = convo_summary
     inserted_act_dur = duration_min
 
+    conversation_message = init_role.StanfordTownConversationMessage.from_conversation(
+        summary=convo_summary,
+        participants=[init_role.name, target_role.name],
+        transcript=convo,
+        duration_minutes=inserted_act_dur,
+    )
+    init_role.publish_message(conversation_message)
+
     act_start_time = target_role.rc.scratch.act_start_time
 
     curr_time = target_role.rc.scratch.curr_time

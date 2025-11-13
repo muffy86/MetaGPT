@@ -306,37 +306,54 @@ def retry_parse_json_text(output: str) -> Union[list, dict]:
     return parsed_data
 
 
-def extract_content_from_output(content: str, right_key: str = "[/CONTENT]"):
-    """extract xxx from [CONTENT](xxx)[/CONTENT] using regex pattern"""
-
-    def re_extract_content(cont: str, pattern: str) -> str:
-        matches = re.findall(pattern, cont, re.DOTALL)
-        for match in matches:
-            if match:
-                cont = match
-                break
-        return cont.strip()
-
-    # TODO construct the extract pattern with the `right_key`
-    raw_content = copy.deepcopy(content)
-    pattern = r"\[CONTENT\]([\s\S]*)\[/CONTENT\]"
-    new_content = re_extract_content(raw_content, pattern)
-
-    if not new_content.startswith("{"):
-        # TODO find a more general pattern
-        # # for `[CONTENT]xxx[CONTENT]xxxx[/CONTENT] situation
-        logger.warning(f"extract_content try another pattern: {pattern}")
-        if right_key not in new_content:
-            raw_content = copy.deepcopy(new_content + "\n" + right_key)
-        # # pattern = r"\[CONTENT\](\s*\{.*?\}\s*)\[/CONTENT\]"
-        new_content = re_extract_content(raw_content, pattern)
+def _normalize_key_pair(marker: str) -> tuple[str, str]:
+    """Return the matching pair of markers, keeping backward compatibility with the default [/CONTENT] format."""
+    if marker.startswith("[/") and marker.endswith("]"):
+        left_key = marker.replace("/", "", 1)
+        right_key = marker
+    elif marker.startswith("[") and marker.endswith("]"):
+        left_key = marker
+        right_key = f"{marker[0]}/{marker[1:]}"
     else:
-        if right_key in new_content:
-            idx = new_content.find(right_key)
-            new_content = new_content[:idx]
-            new_content = new_content.strip()
+        left_key = marker
+        right_key = marker
+    return left_key, right_key
 
-    return new_content
+
+def extract_content_from_output(content: str, right_key: str = "[/CONTENT]"):
+    """Extract the payload wrapped in tag pairs like [CONTENT]...[/CONTENT]."""
+
+    def _extract_with_pattern(cont: str, pattern: str) -> Optional[str]:
+        match = re.search(pattern, cont, re.DOTALL)
+        if match and match.group(1):
+            return match.group(1).strip()
+        return None
+
+    if not content:
+        return ""
+
+    left_key, normalized_right_key = _normalize_key_pair(right_key)
+    raw_content = copy.deepcopy(content)
+    tag_pattern = rf"{re.escape(left_key)}\s*([\s\S]*?)\s*{re.escape(normalized_right_key)}"
+
+    new_content = _extract_with_pattern(raw_content, tag_pattern)
+    if new_content:
+        return new_content
+
+    # Try repairing missing tag pairs before re-attempting the extraction.
+    repaired = repair_required_key_pair_missing(raw_content, normalized_right_key)
+    if repaired != raw_content:
+        new_content = _extract_with_pattern(repaired, tag_pattern)
+        if new_content:
+            return new_content
+
+    # As a final fallback, attempt to extract the first balanced JSON object if tags are malformed.
+    json_match = re.search(r"(\{(?:[^{}]|(?R))*\})", raw_content, re.DOTALL)
+    if json_match:
+        return json_match.group(1).strip()
+
+    logger.warning("extract_content_from_output could not locate bounded content; returning stripped input.")
+    return raw_content.strip()
 
 
 def extract_state_value_from_output(content: str) -> str:
@@ -348,12 +365,9 @@ def extract_state_value_from_output(content: str) -> str:
         content (str): llm's output from `Role._think`
     """
     content = content.strip()  # deal the output cases like " 0", "0\n" and so on.
-    pattern = (
-        r"(?<!-)[0-9]"  # TODO find the number using a more proper method not just extract from content using pattern
-    )
+    pattern = r"(?<![\d-])(-?\d+)(?!\d)"
     matches = re.findall(pattern, content, re.DOTALL)
-    matches = list(set(matches))
-    state = matches[0] if len(matches) > 0 else "-1"
+    state = matches[0] if matches else "-1"
     return state
 
 
