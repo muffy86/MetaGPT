@@ -13,6 +13,15 @@ from pydantic import BaseModel, Field, model_validator
 
 from metagpt.configs.browser_config import BrowserConfig
 from metagpt.configs.embedding_config import EmbeddingConfig
+from metagpt.configs.environment_components_config import (
+    AccessConfig,
+    AutomationConfig,
+    ConnectorsConfig,
+    MCPConfig,
+    RAGConfig,
+    SkillsConfig,
+    ToolsConfig,
+)
 from metagpt.configs.exp_pool_config import ExperiencePoolConfig
 from metagpt.configs.llm_config import LLMConfig, LLMType
 from metagpt.configs.mermaid_config import MermaidConfig
@@ -54,6 +63,7 @@ class Config(CLIParams, YamlModel):
 
     # RAG Embedding
     embedding: EmbeddingConfig = EmbeddingConfig()
+    rag: RAGConfig = Field(default_factory=RAGConfig)
 
     # omniparse
     omniparse: OmniParseConfig = OmniParseConfig()
@@ -66,6 +76,10 @@ class Config(CLIParams, YamlModel):
     enable_search: bool = False
     browser: BrowserConfig = BrowserConfig()
     mermaid: MermaidConfig = MermaidConfig()
+    tools: ToolsConfig = Field(default_factory=ToolsConfig)
+    skills: SkillsConfig = Field(default_factory=SkillsConfig)
+    connectors: ConnectorsConfig = Field(default_factory=ConnectorsConfig)
+    mcp: MCPConfig = Field(default_factory=MCPConfig)
 
     # Storage Parameters
     s3: Optional[S3Config] = None
@@ -97,6 +111,8 @@ class Config(CLIParams, YamlModel):
 
     # RoleZero's configuration
     role_zero: RoleZeroConfig = Field(default_factory=RoleZeroConfig)
+    access: AccessConfig = Field(default_factory=AccessConfig)
+    automation: AutomationConfig = Field(default_factory=AutomationConfig)
 
     @classmethod
     def from_home(cls, path):

@@ -6,3 +6,89 @@ llm:
   model: "gpt-4-turbo"  # or gpt-3.5-turbo
   base_url: "https://api.openai.com/v1"  # or forward url / other llm url
   api_key: "YOUR_API_KEY"
+
+# Environment components
+mcp:
+  enabled: false
+  auto_discover: false
+  allow_tool_fallback: true
+  servers:
+    local_fs:
+      enabled: false
+      transport: "stdio"
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+      capabilities: ["resources", "tools"]
+      read_only: false
+
+rag:
+  enabled: false
+  retriever: "bm25"
+  ranker: "none"
+  top_k: 5
+  chunk_size: 1024
+  chunk_overlap: 128
+  persist_path: ".rag_data"
+  collection_name: "metagpt"
+  enable_citations: true
+
+connectors:
+  enabled: false
+  items:
+    github:
+      enabled: false
+      provider: "github"
+      endpoint: "https://api.github.com"
+      auth_type: "bearer"
+      auth_env: "GITHUB_TOKEN"
+      scopes: ["repo:read"]
+      read_only: true
+
+skills:
+  enabled: true
+  declaration_file: "docs/.well-known/skills.yaml"
+  entity: "Assistant"
+  runtime_mode: "on_demand"
+  allowlist: []
+  denylist: []
+  auto_reload: false
+
+tools:
+  enabled: true
+  execution_mode: "allow_all"
+  include_tools: []
+  exclude_tools: []
+  include_tags: []
+  strict_validation: true
+  command_timeout: 120
+
+access:
+  enabled: false
+  default_policy: "allow"
+  allow_network: true
+  allow_filesystem_write: true
+  allow_shell: false
+  allowed_paths: []
+  denied_paths: []
+  allowed_tools: []
+  denied_tools: []
+  allowed_connectors: []
+  denied_connectors: []
+
+automation:
+  enabled: false
+  dry_run: true
+  default_max_concurrency: 1
+  jobs:
+    daily_sync:
+      enabled: false
+      trigger:
+        enabled: true
+        type: "schedule"
+        schedule: "0 2 * * *"
+      workflow:
+        - "connectors.sync:github"
+        - "rag.index:update"
+      max_retries: 2
+      retry_backoff_seconds: 5
+      timeout_seconds: 600

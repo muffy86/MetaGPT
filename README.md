@@ -96,6 +96,17 @@ llm:
   api_key: "YOUR_API_KEY"
 ```
 
+MetaGPT also supports first-class environment component sections in `config2.yaml` for:
+
+- `mcp` (MCP server registry and transport options)
+- `rag` (retriever/ranker/chunking/persistence defaults)
+- `connectors` (external system connectors and auth hints)
+- `skills` and `tools` (execution policy and selection)
+- `access` (runtime access policy toggles)
+- `automation` (trigger-driven job workflows)
+
+See [`config/config2.example.yaml`](config/config2.example.yaml) for a complete end-to-end template.
+
 ### Usage
 
 After installation, you can use MetaGPT at CLI

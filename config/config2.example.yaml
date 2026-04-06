@@ -97,6 +97,109 @@ role_zero:
   similarity_top_k: 5 # The number of long-term memories to retrieve.
   use_llm_ranker: false # Whether to use LLM Reranker to get better result. Default is `false`.
 
+# Environment components (MCP / RAG pipeline / connectors / skills / tools / access / automation)
+mcp:
+  enabled: false
+  auto_discover: false
+  allow_tool_fallback: true
+  default_server: ""
+  servers:
+    local_fs:
+      enabled: false
+      transport: "stdio"   # stdio/http/sse/websocket
+      command: "npx"
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+      env: {}
+      timeout: 30
+      startup_timeout: 60
+      capabilities: ["resources", "tools"]
+      read_only: false
+    remote_docs:
+      enabled: false
+      transport: "http"
+      url: "https://your-mcp-server.example.com/mcp"
+      headers:
+        Authorization: "Bearer ${MCP_TOKEN}"
+      timeout: 30
+      startup_timeout: 60
+      capabilities: ["resources"]
+      read_only: true
+
+rag:
+  enabled: false
+  retriever: "bm25" # bm25/chroma/faiss/elasticsearch
+  ranker: "none" # none/llm/object/colbert/cohere/bge
+  top_k: 5
+  chunk_size: 1024
+  chunk_overlap: 128
+  persist_path: ".rag_data"
+  collection_name: "metagpt"
+  enable_citations: true
+
+connectors:
+  enabled: false
+  default_connector: ""
+  items:
+    github:
+      enabled: false
+      provider: "github"
+      endpoint: "https://api.github.com"
+      auth_type: "bearer" # none/api_key/bearer/oauth2/basic
+      auth_env: "GITHUB_TOKEN"
+      scopes: ["repo:read"]
+      read_only: true
+      max_items_per_sync: 100
+      options: {}
+
+skills:
+  enabled: true
+  declaration_file: "docs/.well-known/skills.yaml"
+  entity: "Assistant"
+  runtime_mode: "on_demand" # manual/on_demand/always_on
+  allowlist: []
+  denylist: []
+  auto_reload: false
+
+tools:
+  enabled: true
+  execution_mode: "allow_all" # allow_all/allowlisted/tagged
+  include_tools: []
+  exclude_tools: []
+  include_tags: []
+  strict_validation: true
+  command_timeout: 120
+
+access:
+  enabled: false
+  default_policy: "allow" # allow/deny
+  allow_network: true
+  allow_filesystem_write: true
+  allow_shell: false
+  allowed_paths: []
+  denied_paths: []
+  allowed_tools: []
+  denied_tools: []
+  allowed_connectors: []
+  denied_connectors: []
+
+automation:
+  enabled: false
+  dry_run: true
+  default_max_concurrency: 1
+  jobs:
+    daily_sync:
+      enabled: false
+      trigger:
+        enabled: true
+        type: "schedule" # manual/schedule/event/webhook
+        schedule: "0 2 * * *"
+      workflow:
+        - "connectors.sync:github"
+        - "rag.index:update"
+      max_retries: 2
+      retry_backoff_seconds: 5
+      timeout_seconds: 600
+
 azure_tts_subscription_key: "YOUR_SUBSCRIPTION_KEY"
 azure_tts_region: "eastus"
 
