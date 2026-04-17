@@ -1,0 +1,13 @@
+description: "Genesis master eval manifest"
+providers:
+  - id: "openai:api_base=http://localhost:4000/v1,model=claude-sonnet-4-5"
+prompts:
+  - "Summarize user's calendar for tomorrow with citations."
+tests:
+  - vars:
+      input: "what's on tomorrow"
+    assert:
+      - type: contains
+        value: "[citation:"
+      - type: llm-rubric
+        value: "Response should be concise and factual."

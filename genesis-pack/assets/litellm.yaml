@@ -1,0 +1,24 @@
+model_list:
+  - model_name: planner-local
+    litellm_params:
+      model: ollama/qwen3-coder:30b
+      api_base: http://localhost:11434
+  - model_name: planner-mobile
+    litellm_params:
+      model: ollama/qwen3-coder:7b
+      api_base: http://localhost:11434
+  - model_name: agent-default
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: agent-untrusted
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+routing_strategy: simple-shuffle
+fallbacks:
+  - agent-default:
+      - planner-local
+  - planner-local:
+      - planner-mobile

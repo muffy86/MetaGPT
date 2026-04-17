@@ -1,0 +1,42 @@
+input:
+  broker:
+    inputs:
+      - http_server:
+          path: /webhook/slack
+          rate_limit: slack_rl
+      - generate:
+          interval: 30m
+          mapping: root = {}
+pipeline:
+  processors:
+    - switch:
+        - check: 'meta("Http-X-Slack-Signature") != null'
+          processors:
+            - mapping: root = this.event.or(this)
+        - processors:
+            - command:
+                name: curl
+                args_mapping: >-
+                  ["-s","https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL}",
+                   "-H","Authorization: Bearer ${SLACK_BOT_TOKEN}"]
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.ts.or(now()),
+          "source": "slack",
+          "kind": "message",
+          "actor": this.user.or(this.bot_id).or("unknown"),
+          "subjects": [this.channel.or("unknown")],
+          "title": this.channel.or("slack"),
+          "body": this.text.or(""),
+          "thread_id": this.thread_ts.or(this.ts),
+          "meta": this
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

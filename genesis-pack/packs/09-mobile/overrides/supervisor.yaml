@@ -1,0 +1,5 @@
+profile: android-termux
+defaults:
+  model: qwen3-coder:7b
+  retrieval_timeout_ms: 5000
+  max_tokens: 1200

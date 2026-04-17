@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks protect
+        entry: gitleaks protect --staged --redact
+        language: system
+        pass_filenames: false
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.6
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: biome check
+        entry: pnpm exec biome check --apply .
+        language: system
+        pass_filenames: false
+      - id: opa-test
+        name: opa policy tests
+        entry: bash -lc 'if command -v opa >/dev/null 2>&1; then opa test assets/policies.rego; else echo "opa not installed, skipping"; fi'
+        language: system
+        pass_filenames: false
+      - id: skill-lint
+        name: skill lint
+        entry: python3 packs/08-forge/skill_lint.py skills
+        language: system
+        pass_filenames: false

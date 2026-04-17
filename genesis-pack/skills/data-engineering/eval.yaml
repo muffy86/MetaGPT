@@ -1,0 +1,6 @@
+name: data-engineering-evals
+cases:
+  - prompt: "join these parquet files and summarize"
+    expect_contains: ["polars", "parquet"]
+  - prompt: "validate schema contracts"
+    expect_contains: ["contract", "idempotent"]

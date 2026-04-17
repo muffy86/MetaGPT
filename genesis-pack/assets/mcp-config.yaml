@@ -1,0 +1,25 @@
+mcp_gateway:
+  endpoint: "http://localhost:18789"
+  mode: "gateway"
+  tool_search:
+    enabled: true
+    top_k: 12
+servers:
+  - name: filesystem
+    transport: http
+    endpoint: "http://localhost:7001/mcp"
+  - name: playwright
+    transport: http
+    endpoint: "http://localhost:7002/mcp"
+  - name: github
+    transport: http
+    endpoint: "http://localhost:7003/mcp"
+  - name: postgres
+    transport: http
+    endpoint: "http://localhost:7004/mcp"
+  - name: linear
+    transport: http
+    endpoint: "http://localhost:7005/mcp"
+  - name: maps
+    transport: http
+    endpoint: "http://localhost:7006/mcp"

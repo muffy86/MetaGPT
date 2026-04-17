@@ -1,0 +1,4 @@
+name: genesis-evals
+cases:
+  - prompt: "genesis status"
+    expect_contains: ["policy", "routing", "replay"]

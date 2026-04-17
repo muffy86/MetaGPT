@@ -1,0 +1,29 @@
+input:
+  file_watch:
+    paths:
+      - ~/Recordings
+    poll_interval: 15s
+pipeline:
+  processors:
+    - command:
+        name: bash
+        args_mapping: '["-lc","whisper-cpp --model models/ggml-base.en.bin --output-json --file " + this.path]'
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": now(),
+          "source": "whisper",
+          "kind": "transcript",
+          "actor": "self",
+          "title": this.path.split("/").index(-1),
+          "body": this.stdout.or(""),
+          "meta": {"path": this.path}
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

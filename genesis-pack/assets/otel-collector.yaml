@@ -1,0 +1,31 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+processors:
+  batch:
+  attributes/pii_hash:
+    actions:
+      - key: user_intent
+        action: hash
+      - key: prompt
+        action: hash
+      - key: completion
+        action: hash
+
+exporters:
+  debug:
+    verbosity: basic
+  otlp/phoenix:
+    endpoint: phoenix:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/pii_hash, batch]
+      exporters: [debug, otlp/phoenix]

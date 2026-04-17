@@ -1,0 +1,27 @@
+input:
+  sql_select:
+    driver: sqlite
+    dsn: "file:${BROWSER_HISTORY_DB}?mode=ro&immutable=1"
+    query: |
+      SELECT id, visit_time AS ts, url, title
+      FROM visits
+      WHERE visit_time > ?
+      ORDER BY visit_time
+    args_mapping: root = [metadata("last_ts").or(0)]
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.ts,
+          "source": "browser-history",
+          "kind": "history",
+          "actor": "self",
+          "subjects": [this.url],
+          "title": this.title.or(this.url),
+          "body": this.url,
+          "thread_id": this.id.string(),
+          "meta": {}
+        }
+    - python: { script: "packs/02-sensors/transforms/redact.py" }
+output: { iceberg: { catalog: data/exocortex, table: events } }

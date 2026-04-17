@@ -1,0 +1,14 @@
+data/
+runs/
+vault/
+tmp/
+*.age
+*.env
+!.env.example
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+*.pyc

@@ -1,0 +1,33 @@
+input:
+  imap:
+    host: ${IMAP_HOST}
+    port: ${IMAP_PORT:993}
+    tls: true
+    username: ${IMAP_USERNAME}
+    password: ${IMAP_PASSWORD}
+    mailbox: INBOX
+    query: "UNSEEN"
+    poll_interval: 120s
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v4(),
+          "ts": now().ts_unix(),
+          "source": "email-imap",
+          "kind": "message",
+          "actor": this.from,
+          "subjects": [this.to],
+          "title": this.subject,
+          "body": this.text.or(""),
+          "thread_id": this.message_id.or(""),
+          "meta": {"mailbox": this.mailbox.or("INBOX")}
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

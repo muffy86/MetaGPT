@@ -1,0 +1,23 @@
+input:
+  file:
+    paths:
+      - ~/.zsh_history
+      - ~/.bash_history
+      - ~/.local/share/fish/fish_history
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": now().ts_unix(),
+          "source": "cli-history",
+          "kind": "command",
+          "actor": "self",
+          "subjects": ["self"],
+          "title": "shell command",
+          "body": this.content.or(this),
+          "meta": {"path": this.path.or("unknown")}
+        }
+    - python: { script: "packs/02-sensors/transforms/redact.py" }
+    - python: { script: "packs/02-sensors/transforms/classify.py" }
+output: { iceberg: { catalog: data/exocortex, table: events } }

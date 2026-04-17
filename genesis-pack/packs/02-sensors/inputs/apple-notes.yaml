@@ -1,0 +1,28 @@
+input:
+  sql_select:
+    driver: sqlite
+    dsn: "${APPLE_NOTES_DSN:-file:~/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite?mode=ro&immutable=1}"
+    query: |
+      SELECT Z_PK as row_id, strftime('%s', ZMODIFICATIONDATE + 978307200, 'unixepoch') as ts,
+             ZTITLE1 as title, ZSNIPPET as body
+      FROM ZICCLOUDSYNCINGOBJECT
+      WHERE ZSNIPPET IS NOT NULL
+      ORDER BY ZMODIFICATIONDATE DESC LIMIT 500
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.ts.number(),
+          "source": "apple-notes",
+          "kind": "note",
+          "actor": "self",
+          "subjects": [],
+          "title": this.title.or(""),
+          "body": this.body.or(""),
+          "thread_id": this.row_id.string(),
+          "meta": {"sensor":"apple-notes"}
+        }
+    - python: { script: "packs/02-sensors/transforms/redact.py" }
+    - python: { script: "packs/02-sensors/transforms/classify.py" }
+output: { iceberg: { catalog: data/exocortex, table: events } }

@@ -1,0 +1,31 @@
+input:
+  caldav:
+    endpoint: ${GCAL_CALDAV_URL}
+    oauth_secret: op://personal/gcal-oauth/json
+    poll_interval: 5m
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.start_ts.or(now()),
+          "source": "gcal",
+          "kind": "calendar_event",
+          "actor": this.organizer.or("unknown"),
+          "subjects": this.attendees.or([]),
+          "title": this.summary.or("calendar event"),
+          "body": this.description.or(""),
+          "meta": {
+            "location": this.location,
+            "calendar": this.calendar,
+            "end_ts": this.end_ts
+          }
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

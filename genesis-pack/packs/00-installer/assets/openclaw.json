@@ -1,0 +1,16 @@
+{
+  "model": "anthropic/claude-opus-4.5",
+  "fallback_model": "ollama/qwen3-coder:30b",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+  "tracing": {
+    "otlp_endpoint": "http://127.0.0.1:4317",
+    "service_name": "genesis-pack"
+  },
+  "replay": {
+    "enabled": true,
+    "trace_dir": "runs"
+  }
+}

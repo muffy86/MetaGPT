@@ -1,0 +1,22 @@
+[project]
+name = "genesis-pack-runtime"
+version = "0.1.0"
+description = "Runtime assets for GENESIS-PACK 02-10"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "duckdb>=1.2.2",
+  "httpx>=0.28.1",
+  "lancedb>=0.22.0",
+  "opentelemetry-sdk>=1.33.1",
+]
+
+[project.optional-dependencies]
+retrieval = [
+  "kuzu>=0.11.2",
+  "sentence-transformers>=3.4.1",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

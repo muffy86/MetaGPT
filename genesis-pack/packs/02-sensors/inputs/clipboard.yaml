@@ -1,0 +1,22 @@
+input:
+  stdin: {}
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": now().ts_unix(),
+          "source": "clipboard",
+          "kind": "clipboard",
+          "actor": "self",
+          "subjects": [],
+          "title": "clipboard capture",
+          "body": this.string(),
+          "thread_id": "clipboard",
+          "meta": {"platform": env("TARGET_PLATFORM").or("auto")}
+        }
+    - python: { script: "packs/02-sensors/transforms/redact.py" }
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

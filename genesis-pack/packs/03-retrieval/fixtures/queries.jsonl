@@ -1,0 +1,5 @@
+{"query":"what is my latest calendar event", "expects": []}
+{"query":"messages from github this week", "expects": []}
+{"query":"finance events over 100 usd", "expects": []}
+{"query":"recent clipboard items", "expects": []}
+{"query":"browser history related to docs", "expects": []}

@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    command: ["--config", "/app/assets/litellm.yaml", "--host", "0.0.0.0", "--port", "4000"]
+    volumes:
+      - ./assets/litellm.yaml:/app/assets/litellm.yaml:ro
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./assets/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    restart: unless-stopped
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"
+    restart: unless-stopped
+
+  redpanda-connect:
+    image: docker.redpanda.com/redpandadata/connect:latest
+    command: ["run", "/configs/main.yaml"]
+    volumes:
+      - ./packs/02-sensors/enabled:/configs/enabled:ro
+      - ./packs/02-sensors/main.yaml:/configs/main.yaml:ro
+    ports:
+      - "8880:8880"
+    restart: unless-stopped
+
+  inngest:
+    image: inngest/inngest:latest
+    command: ["inngest", "dev", "--url", "http://host.docker.internal:8000/api/inngest"]
+    ports:
+      - "8288:8288"
+    restart: unless-stopped

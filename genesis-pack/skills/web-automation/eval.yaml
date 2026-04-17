@@ -1,0 +1,6 @@
+name: web-automation-evals
+cases:
+  - prompt: "fill this form and summarize result"
+    expect_contains: ["otlp", "citation"]
+  - prompt: "authenticated scrape of account ledger"
+    expect_contains: ["mcp gateway", "accessibility tree"]

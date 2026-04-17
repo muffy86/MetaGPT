@@ -1,0 +1,13 @@
+description: local promptfoo suite
+providers:
+  - id: openai:claude-sonnet-4-5
+    config:
+      apiBaseUrl: http://localhost:4000/v1
+prompts:
+  - "Summarize with citations: {{input}}"
+tests:
+  - vars:
+      input: "calendar events"
+    assert:
+      - type: contains
+        value: "citation"

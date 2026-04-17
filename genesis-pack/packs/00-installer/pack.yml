@@ -1,0 +1,20 @@
+name: runtime-platform
+version: 1.0.0
+depends_on:
+  - observability-evals
+  - policy-security
+services:
+  - devcontainer
+  - docker-compose
+  - just
+storage:
+  - .devcontainer/
+  - data/
+  - runs/
+env:
+  REQUIRED:
+    - OP_SERVICE_ACCOUNT_TOKEN
+  OPTIONAL:
+    - OPENCLAW_MODEL
+    - LITELLM_BASE_URL
+entrypoint: ./scripts/bootstrap-runtime.sh

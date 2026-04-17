@@ -1,0 +1,27 @@
+input:
+  http_client:
+    url: http://localhost:8080/v1/receive/${SIGNAL_NUMBER}
+    poll_interval: 45s
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.timestamp.or(now()),
+          "source": "signal",
+          "kind": "message",
+          "actor": this.source.or("unknown"),
+          "subjects": [this.envelope.sourceNumber.or("unknown")],
+          "title": "signal",
+          "body": this.dataMessage.message.or(""),
+          "thread_id": this.dataMessage.groupInfo.groupId.or(this.source),
+          "meta": this
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events
