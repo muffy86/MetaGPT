@@ -29,5 +29,13 @@ just doctor
 - CLI: `packs/06-interface/gx.sh`
 - Installer: `packs/00-installer/scripts/pack-install.sh`
 - Doctor: `packs/00-installer/scripts/doctor.sh`
+- Dependency bootstrap: `packs/00-installer/deps.sh`
+- Data bootstrap: `packs/00-installer/init-data.sh`
+- Fragment merge: `packs/00-installer/merge-fragments.sh`
+- Model preload: `packs/00-installer/models.sh`
 - Replay: `just replay <session>`
 - Eval: `just eval-all`
+
+## Fold 7 frontier references
+
+See `docs/fold7-frontier-agents.md` for live browser and mobile-install links.
