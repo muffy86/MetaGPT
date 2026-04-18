@@ -2,14 +2,37 @@ set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 default: doctor
 
+profile value="linux-x64":
+	printf "%s\n" "{{value}}" > .profile
+	@echo "profile set to {{value}}"
+
+deps:
+	./packs/00-installer/deps.sh
+
+models:
+	./packs/00-installer/models.sh
+
+init-data:
+	./packs/00-installer/init-data.sh
+
+merge-fragments:
+	./packs/00-installer/merge-fragments.sh
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
 pack-install:
 	./packs/00-installer/scripts/pack-install.sh
 
 doctor:
-	./packs/00-installer/scripts/doctor.sh desktop
+	./packs/00-installer/doctor.sh
 
 doctor-mobile:
-	./packs/00-installer/scripts/doctor.sh android-termux
+	printf "android-termux\n" > .profile
+	./packs/00-installer/doctor.sh
 
 exo-init:
 	python3 packs/01-exocortex/init.py
