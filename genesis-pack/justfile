@@ -65,3 +65,6 @@ eval-all:
 
 opa-test:
 	opa test assets/policies.rego
+
+completion-check:
+	python3 scripts/completion_check.py

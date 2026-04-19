@@ -35,6 +35,13 @@ just doctor
 - Model preload: `packs/00-installer/models.sh`
 - Replay: `just replay <session>`
 - Eval: `just eval-all`
+- End-user app shell: `./start.sh` (opens on `http://localhost:7777`)
+- Completion test: `just completion-check`
+
+## Product mode (Path A) + Operator mode (Path B)
+
+- Path A (app user): run `./start.sh`, open `http://localhost:7777`, use Ask / Daily Brief / Twin Draft.
+- Path B (operator): use `docs/operator-runbook.md` and `just completion-check` for readiness reports.
 
 ## Fold 7 frontier references
 

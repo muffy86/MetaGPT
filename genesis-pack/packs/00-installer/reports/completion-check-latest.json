@@ -1,0 +1,72 @@
+{
+  "ts": "2026-04-19T21:02:12.610054+00:00",
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "compile",
+      "ok": true,
+      "code": 0,
+      "cmd": "python3 -m compileall packs",
+      "stdout": "led'...\nListing 'packs/02-sensors/inputs'...\nListing 'packs/02-sensors/scripts'...\nListing 'packs/02-sensors/transforms'...\nListing 'packs/03-retrieval'...\nListing 'packs/03-retrieval/fixtures'...\nListing 'packs/04-twin'...\nListing 'packs/05-autopilot'...\nListing 'packs/05-autopilot/scripts'...\nListing 'packs/05-autopilot/tests'...\nListing 'packs/05-autopilot/triggers'...\nListing 'packs/06-interface'...\nListing 'packs/06-interface/web'...\nCompiling 'packs/06-interface/web/app.py'...\nListing 'packs/07-lab'...\nListing 'packs/07-lab/assets'...\nListing 'packs/07-lab/inspect'...\nListing 'packs/07-lab/reports'...\nListing 'packs/07-lab/scripts'...\nListing 'packs/08-forge'...\nListing 'packs/08-forge/assets'...\nListing 'packs/08-forge/scripts'...\nListing 'packs/09-mobile'...\nListing 'packs/09-mobile/bridge'...\nListing 'packs/09-mobile/install'...\nListing 'packs/09-mobile/overrides'...\nListing 'packs/09-mobile/scripts'...\nListing 'packs/09-mobile/services'...\nListing 'packs/09-mobile/services/gx'...\nListing 'packs/09-mobile/services/sensors'...\nListing 'packs/09-mobile/shortcuts'...\nListing 'packs/10-crypto'...\nListing 'packs/10-crypto/adapters'...\nListing 'packs/10-crypto/agents'...\nListing 'packs/10-crypto/agents/rig-agent'...\nListing 'packs/10-crypto/bootstrap'...\nListing 'packs/10-crypto/defai'...\nListing 'packs/10-crypto/infra'...\nListing 'packs/10-crypto/scripts'...\nListing 'packs/10-crypto/wallets'...\nListing 'packs/common'...\nListing 'packs/retrieval'...\nListing 'packs/twin'...",
+      "stderr": ""
+    },
+    {
+      "name": "pack-install",
+      "ok": true,
+      "code": 0,
+      "cmd": "./packs/00-installer/scripts/pack-install.sh",
+      "stdout": "exocortex init complete\nenabled sensor: screenpipe.yaml\nenabled sensor: clipboard.yaml\nenabled sensor: browser-history.yaml\nenabled sensor: cli-history.yaml\nenabled sensor: obsidian.yaml\nsensor defaults enabled in /workspace/genesis-pack/packs/../data/sensors/enabled\npack-install complete",
+      "stderr": ""
+    },
+    {
+      "name": "doctor",
+      "ok": true,
+      "code": 0,
+      "cmd": "./packs/00-installer/scripts/doctor.sh",
+      "stdout": "doctor: green",
+      "stderr": ""
+    },
+    {
+      "name": "skill-lint",
+      "ok": true,
+      "code": 0,
+      "cmd": "python3 packs/08-forge/skill_lint.py skills",
+      "stdout": "skill lint: ok",
+      "stderr": ""
+    },
+    {
+      "name": "retrieval-eval",
+      "ok": true,
+      "code": 0,
+      "cmd": "python3 packs/03-retrieval/eval.py --quick",
+      "stdout": "{\"total\": 5, \"recall_at_10\": 0.0}",
+      "stderr": ""
+    },
+    {
+      "name": "twin-calibrate",
+      "ok": true,
+      "code": 0,
+      "cmd": "python3 packs/04-twin/calibrate.py",
+      "stdout": "runs/twin-calibration-2026-04-19.md",
+      "stderr": ""
+    },
+    {
+      "name": "strategy-run",
+      "ok": true,
+      "code": 0,
+      "cmd": "python3 packs/10-crypto/defai/run_strategy.py",
+      "stdout": "{\"verdict\": {\"pass\": true, \"checks\": {\"cap\": true, \"oracle_divergence\": true, \"simulate\": true, \"policy\": true, \"twin_prior\": true, \"hitl\": true}}, \"event_id\": \"01KPKRT3J2PNQ7AFVEVWNK5Y3B\"}",
+      "stderr": ""
+    },
+    {
+      "name": "replay",
+      "ok": true,
+      "code": 0,
+      "cmd": "python3 packs/07-lab/replay.py runs/default/trace.jsonl --allow-missing",
+      "stdout": "{\"total\":0,\"matched\":0,\"diverged\":0}",
+      "stderr": ""
+    }
+  ]
+}
