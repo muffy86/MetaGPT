@@ -1,0 +1,29 @@
+host: "127.0.0.1"
+port: 18789
+system_prompt: |
+  You are MetaGPT MCP Chat. Answer clearly and safely.
+resource_pack_dir: "docs/resources/mcp_chat_packs"
+max_message_chars: 8000
+timeout_seconds: 120
+
+# Optional: enforce signature checks on inbound MCP events.
+inbound_signature_secret: ""
+
+# Optional: emit signed webhooks for chat.completed / mcp.event.ingested.
+webhook_url: ""
+webhook_secret: ""
+
+models:
+  # Primary local model (no paid API key required if Ollama is running).
+  - name: "local-ollama"
+    api_type: "ollama"
+    base_url: "http://127.0.0.1:11434/api"
+    api_key: "ollama"
+    model: "llama3.1:8b"
+
+  # Optional hosted fallback model.
+  # - name: "openai-fallback"
+  #   api_type: "openai"
+  #   base_url: "https://api.openai.com/v1"
+  #   api_key: "${OPENAI_API_KEY}"
+  #   model: "gpt-4o-mini"
