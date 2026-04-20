@@ -34,6 +34,15 @@ class _StubService:
         return {"status": "accepted", "session": session_id, "event": event, "payload": payload}
 
 
+def _build_stub_app(settings: MCPChatSettings):
+    app = create_app(
+        settings=settings,
+        service_override=_StubService(),
+        skip_skill_discovery=True,
+    )
+    return app
+
+
 @pytest.mark.asyncio
 async def test_chat_get_post_and_openai_compat():
     settings = MCPChatSettings(
@@ -47,9 +56,7 @@ async def test_chat_get_post_and_openai_compat():
             }
         ]
     )
-    app = create_app(settings)
-    app["chat_service"] = _StubService()
-    app["settings"] = settings
+    app = _build_stub_app(settings)
 
     server = TestServer(app)
     async with server:
@@ -98,9 +105,7 @@ async def test_mcp_events_signature_required():
             }
         ],
     )
-    app = create_app(settings)
-    app["chat_service"] = _StubService()
-    app["settings"] = settings
+    app = _build_stub_app(settings)
 
     payload = {"session": "main", "event": "tool.result", "payload": {"ok": True}}
     body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
@@ -126,3 +131,34 @@ async def test_mcp_events_signature_required():
             ok_body = await ok_rsp.json()
             assert ok_rsp.status == 202
             assert ok_body["status"] == "accepted"
+
+
+def test_build_model_clients_uses_registered_stub_provider():
+    from metagpt.ext.mcp_chat import server as chat_server
+
+    settings = MCPChatSettings(
+        models=[
+            {
+                "name": "dummy",
+                "api_type": "ollama",
+                "base_url": "http://127.0.0.1:11434/api",
+                "api_key": "ollama",
+                "model": "llama3.1:8b",
+            }
+        ]
+    )
+
+    class _StubProvider:
+        def __init__(self, config):
+            self.config = config
+
+        async def acompletion_text(self, messages, stream=False, timeout=120):
+            return "ok"
+
+    clients = chat_server._build_model_clients(  # noqa: SLF001 - tested internal helper
+        settings,
+        llm_factory=lambda config: _StubProvider(config),
+    )
+
+    assert len(clients) == 1
+    assert clients[0].label == "dummy"

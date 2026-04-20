@@ -15,8 +15,6 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence, Tup
 
 import aiohttp
 import yaml
-
-from metagpt.actions.skill_action import SkillAction
 from metagpt.const import METAGPT_ROOT
 from metagpt.logs import logger
 
@@ -252,6 +250,8 @@ class MCPChatService:
         self._skill_runner = skill_runner or self._default_skill_runner
 
     async def _default_skill_runner(self, skill_name: str, args: Dict[str, Any]) -> str:
+        from metagpt.actions.skill_action import SkillAction
+
         return await SkillAction.find_and_call_function(skill_name, args)
 
     async def _run_skill(self, skill_name: str, args: Dict[str, Any]) -> str:

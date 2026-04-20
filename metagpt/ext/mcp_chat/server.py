@@ -8,14 +8,12 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
-import metagpt.provider  # noqa: F401  # Ensure LLM providers are registered.
 import yaml
 from aiohttp import web
 from pydantic import BaseModel, Field, ValidationError
 
-from metagpt.configs.llm_config import LLMConfig, LLMType
 from metagpt.const import METAGPT_ROOT
 from metagpt.ext.mcp_chat.service import (
     DEFAULT_SYSTEM_PROMPT,
@@ -29,7 +27,50 @@ from metagpt.ext.mcp_chat.service import (
     load_resource_packs,
     verify_payload_signature,
 )
-from metagpt.provider.llm_provider_registry import create_llm_instance
+
+
+def _ensure_provider_registered(api_type: str) -> None:
+    """Import provider module on demand so optional deps stay optional."""
+    provider_imports = {
+        "openai": "metagpt.provider.openai_api",
+        "fireworks": "metagpt.provider.openai_api",
+        "open_llm": "metagpt.provider.openai_api",
+        "moonshot": "metagpt.provider.openai_api",
+        "mistral": "metagpt.provider.openai_api",
+        "yi": "metagpt.provider.openai_api",
+        "open_router": "metagpt.provider.openai_api",
+        "deepseek": "metagpt.provider.openai_api",
+        "siliconflow": "metagpt.provider.openai_api",
+        "openrouter": "metagpt.provider.openai_api",
+        "llama_api": "metagpt.provider.openai_api",
+        "anthropic": "metagpt.provider.anthropic_api",
+        "claude": "metagpt.provider.anthropic_api",
+        "gemini": "metagpt.provider.google_gemini_api",
+        "ollama": "metagpt.provider.ollama_api",
+        "ollama.generate": "metagpt.provider.ollama_api",
+        "ollama.embed": "metagpt.provider.ollama_api",
+        "ollama.embeddings": "metagpt.provider.ollama_api",
+        "azure": "metagpt.provider.azure_openai_api",
+        "zhipuai": "metagpt.provider.zhipuai_api",
+        "spark": "metagpt.provider.spark_api",
+        "qianfan": "metagpt.provider.qianfan_api",
+        "dashscope": "metagpt.provider.dashscope_api",
+        "bedrock": "metagpt.provider.bedrock_api",
+        "ark": "metagpt.provider.ark_api",
+        "openrouter_reasoning": "metagpt.provider.openrouter_reasoning",
+        "metagpt": "metagpt.provider.metagpt_api",
+    }
+    module_name = provider_imports.get(api_type)
+    if module_name:
+        __import__(module_name)
+
+
+def _is_provider_registered(api_type: Any) -> bool:
+    try:
+        from metagpt.provider.llm_provider_registry import LLM_REGISTRY
+    except Exception:
+        return False
+    return api_type in LLM_REGISTRY.providers
 
 
 class MCPChatSettings(BaseModel):
@@ -112,7 +153,12 @@ def _resolve_path(path_str: str) -> Path:
     return path if path.is_absolute() else (METAGPT_ROOT / path).resolve()
 
 
-def _build_model_clients(settings: MCPChatSettings) -> List[ModelClient]:
+def _build_model_clients(
+    settings: MCPChatSettings,
+    llm_factory: Optional[Callable[[Any], Any]] = None,
+) -> List[ModelClient]:
+    from metagpt.configs.llm_config import LLMConfig, LLMType
+
     if not settings.models:
         raise ValueError("No models configured; set MCP_CHAT_MODELS_JSON or config/mcp_chat.yaml")
 
@@ -125,18 +171,29 @@ def _build_model_clients(settings: MCPChatSettings) -> List[ModelClient]:
         if isinstance(api_type, str):
             model_input["api_type"] = LLMType(api_type)
         config = LLMConfig.model_validate(model_input)
-        llm = create_llm_instance(config)
+        if llm_factory is not None:
+            create_llm = llm_factory
+        else:
+            if not _is_provider_registered(config.api_type):
+                _ensure_provider_registered(config.api_type)
+            from metagpt.provider.llm_provider_registry import create_llm_instance
+
+            create_llm = create_llm_instance
+        llm = create_llm(config)
         label = model_obj.get("name") or config.model or f"model-{idx}"
         clients.append(ModelClient(label=label, llm=llm))
     return clients
 
 
-def build_service(settings: MCPChatSettings) -> MCPChatService:
+def build_service(
+    settings: MCPChatSettings,
+    skip_skill_discovery: bool = False,
+) -> MCPChatService:
     model_clients = _build_model_clients(settings)
     engine = MultiModelChatEngine(clients=model_clients, timeout_seconds=settings.timeout_seconds)
     packs = load_resource_packs(_resolve_path(settings.resource_pack_dir))
     system_prompt = compose_system_prompt(settings.system_prompt, packs)
-    declared_skills = load_declared_skill_names()
+    declared_skills = [] if skip_skill_discovery else load_declared_skill_names()
 
     return MCPChatService(
         engine=engine,
@@ -295,9 +352,13 @@ async def mcp_events(request: web.Request) -> web.Response:
     return web.json_response(result, status=202)
 
 
-def create_app(settings: Optional[MCPChatSettings] = None) -> web.Application:
+def create_app(
+    settings: Optional[MCPChatSettings] = None,
+    service_override: Optional[MCPChatService] = None,
+    skip_skill_discovery: bool = False,
+) -> web.Application:
     resolved_settings = settings or MCPChatSettings.load()
-    service = build_service(resolved_settings)
+    service = service_override or build_service(resolved_settings, skip_skill_discovery=skip_skill_discovery)
 
     app = web.Application()
     app["settings"] = resolved_settings
