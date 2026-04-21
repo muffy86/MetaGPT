@@ -6,20 +6,7 @@
 @File    : __init__.py
 """
 
-from metagpt.provider.google_gemini_api import GeminiLLM
-from metagpt.provider.ollama_api import OllamaLLM
-from metagpt.provider.openai_api import OpenAILLM
-from metagpt.provider.zhipuai_api import ZhiPuAILLM
-from metagpt.provider.azure_openai_api import AzureOpenAILLM
-from metagpt.provider.metagpt_api import MetaGPTLLM
-from metagpt.provider.human_provider import HumanProvider
-from metagpt.provider.spark_api import SparkLLM
-from metagpt.provider.qianfan_api import QianFanLLM
-from metagpt.provider.dashscope_api import DashScopeLLM
-from metagpt.provider.anthropic_api import AnthropicLLM
-from metagpt.provider.bedrock_api import BedrockLLM
-from metagpt.provider.ark_api import ArkLLM
-from metagpt.provider.openrouter_reasoning import OpenrouterReasoningLLM
+from importlib import import_module
 
 __all__ = [
     "GeminiLLM",
@@ -37,3 +24,30 @@ __all__ = [
     "ArkLLM",
     "OpenrouterReasoningLLM",
 ]
+
+_LAZY_IMPORTS = {
+    "GeminiLLM": ("metagpt.provider.google_gemini_api", "GeminiLLM"),
+    "OpenAILLM": ("metagpt.provider.openai_api", "OpenAILLM"),
+    "ZhiPuAILLM": ("metagpt.provider.zhipuai_api", "ZhiPuAILLM"),
+    "AzureOpenAILLM": ("metagpt.provider.azure_openai_api", "AzureOpenAILLM"),
+    "MetaGPTLLM": ("metagpt.provider.metagpt_api", "MetaGPTLLM"),
+    "OllamaLLM": ("metagpt.provider.ollama_api", "OllamaLLM"),
+    "HumanProvider": ("metagpt.provider.human_provider", "HumanProvider"),
+    "SparkLLM": ("metagpt.provider.spark_api", "SparkLLM"),
+    "QianFanLLM": ("metagpt.provider.qianfan_api", "QianFanLLM"),
+    "DashScopeLLM": ("metagpt.provider.dashscope_api", "DashScopeLLM"),
+    "AnthropicLLM": ("metagpt.provider.anthropic_api", "AnthropicLLM"),
+    "BedrockLLM": ("metagpt.provider.bedrock_api", "BedrockLLM"),
+    "ArkLLM": ("metagpt.provider.ark_api", "ArkLLM"),
+    "OpenrouterReasoningLLM": ("metagpt.provider.openrouter_reasoning", "OpenrouterReasoningLLM"),
+}
+
+
+def __getattr__(name):
+    if name not in _LAZY_IMPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = _LAZY_IMPORTS[name]
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
