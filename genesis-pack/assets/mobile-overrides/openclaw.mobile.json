@@ -1,0 +1,18 @@
+{
+  "model": "ollama/qwen3-coder:7b",
+  "fallback_model": "ollama/qwen3-coder:7b",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 8080
+  },
+  "router": {
+    "litellm_base_url": "http://127.0.0.1:4000"
+  },
+  "mcp": {
+    "gateway": "http://127.0.0.1:18789"
+  },
+  "replay": {
+    "enabled": true,
+    "trace_dir": "runs"
+  }
+}

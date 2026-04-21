@@ -1,0 +1,41 @@
+input:
+  broker:
+    inputs:
+      - http_server:
+          path: /webhook/github
+          rate_limit: github_rl
+      - generate:
+          interval: 1h
+          mapping: root = {}
+pipeline:
+  processors:
+    - switch:
+        - check: 'meta("Http-X-Github-Event") != null'
+          processors:
+            - mapping: root = this
+        - processors:
+            - command:
+                name: gh
+                args_mapping: '["api","/user/events?per_page=100"]'
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.created_at.parse_timestamp_strptime("%Y-%m-%dT%H:%M:%SZ"),
+          "source": "github",
+          "kind": this.type.lowercase(),
+          "actor": this.actor.login,
+          "subjects": [this.repo.name],
+          "title": this.payload.commits.or([]).map_each(c -> c.message).join(" | "),
+          "body": this.payload.pull_request.body.or(
+            this.payload.commits.or([]).map_each(c -> c.message).join("\n")
+          ),
+          "meta": this.payload
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

@@ -1,0 +1,16 @@
+set shell := ["bash", "-cu"]
+
+default:
+  @just --list
+
+bootstrap:
+  ./scripts/bootstrap-runtime.sh
+
+doctor:
+  ./scripts/doctor.sh
+
+install:
+  ./scripts/install-genesis-pack.sh
+
+replay session:
+  python3 packs/05-orchestrator/replay.py "runs/{{session}}/trace.jsonl"

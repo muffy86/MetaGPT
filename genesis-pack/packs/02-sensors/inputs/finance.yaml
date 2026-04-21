@@ -1,0 +1,41 @@
+input:
+  broker:
+    inputs:
+      - http_server:
+          path: /webhook/finance/plaid
+      - file:
+          paths: ["${FINANCE_DROP_DIR:/workspace/data/sensors/finance}/**/*.csv"]
+          scanner:
+            check_interval: 60s
+pipeline:
+  processors:
+    - mapping: |
+        root = if this.transactions != null { this.transactions } else { [this] }
+    - unarchive:
+        format: json_array
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.date.or(now()),
+          "source": "finance",
+          "kind": "transaction",
+          "actor": this.account_owner.or("self"),
+          "subjects": [this.account_id.or("unknown")],
+          "title": this.name.or(this.description).or("transaction"),
+          "body": this.merchant_name.or(this.description).or(""),
+          "amount": this.amount.or(0),
+          "currency": this.iso_currency_code.or("USD"),
+          "meta": {
+            "institution": this.institution_name,
+            "category": this.category,
+            "pending": this.pending.or(false)
+          }
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

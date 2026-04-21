@@ -1,0 +1,19 @@
+name: retrieval
+version: 1.0.0
+depends_on:
+  - sensors
+  - exocortex
+services:
+  - retrieval-api
+ports:
+  - 9010
+storage:
+  - data/exocortex/
+  - data/ledger.duckdb
+env:
+  REQUIRED: []
+  OPTIONAL:
+    - OLLAMA_HOST
+    - RERANK_MODEL
+    - EMBED_MODEL
+entrypoint: ./scripts/bootstrap-retrieval.sh

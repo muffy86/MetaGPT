@@ -1,0 +1,19 @@
+name: android-edge
+version: 1.0.0
+depends_on:
+  - sensors
+services:
+  - adb
+  - kde-connect
+  - syncthing
+ports:
+  - 17600
+  - 22000
+storage:
+  - data/android
+env:
+  REQUIRED: []
+  OPTIONAL:
+    - ADB_SERIAL
+    - ANDROID_SMS_DB_PATH
+    - ANDROID_CLIPBOARD_BRIDGE

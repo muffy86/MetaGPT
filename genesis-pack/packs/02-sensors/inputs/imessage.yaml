@@ -1,0 +1,32 @@
+input:
+  sql_select:
+    driver: sqlite
+    dsn: "file:/Users/$USER/Library/Messages/chat.db?mode=ro&immutable=1"
+    query: |
+      SELECT m.ROWID, m.date/1000000000 + 978307200 as ts,
+             h.id as actor, m.text as body, m.cache_roomnames as room,
+             m.is_from_me
+      FROM message m LEFT JOIN handle h ON m.handle_id=h.ROWID
+      WHERE m.date > ? ORDER BY m.date
+    args_mapping: root = [metadata("last_ts").or(0)]
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.ts,
+          "source": "imessage",
+          "kind": "message",
+          "actor": if this.is_from_me { "self" } else { this.actor },
+          "subjects": [this.actor],
+          "body": this.body,
+          "thread_id": this.room.or(this.actor)
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

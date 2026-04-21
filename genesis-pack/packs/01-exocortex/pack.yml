@@ -1,0 +1,4 @@
+name: exocortex
+version: 1.0.0
+services: [duckdb]
+entrypoint: python3 init.py

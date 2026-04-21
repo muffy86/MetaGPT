@@ -1,0 +1,17 @@
+{
+  "name": "genesis-pack",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "genesis",
+  "workspaceFolder": "/workspace/genesis-pack",
+  "remoteUser": "ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python3"
+      }
+    }
+  }
+}

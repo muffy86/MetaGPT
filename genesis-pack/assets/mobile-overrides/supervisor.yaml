@@ -1,0 +1,12 @@
+profile: android-termux
+planner_model: qwen3-coder:7b
+router:
+  endpoint: http://localhost:4000
+  timeout_ms: 12000
+mcp_gateway:
+  endpoint: http://localhost:18789
+telemetry:
+  otlp_endpoint: http://localhost:4317
+limits:
+  max_parallel_subagents: 2
+  compact_after_turns: 30

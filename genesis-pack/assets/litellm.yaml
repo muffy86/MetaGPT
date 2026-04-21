@@ -1,0 +1,45 @@
+model_list:
+  # T0 local
+  - model_name: tier-0
+    litellm_params:
+      model: ollama/qwen3-coder:7b
+      api_base: http://host.docker.internal:11434
+  - model_name: tier-0-classify
+    litellm_params:
+      model: ollama/gemma3:4b
+      api_base: http://host.docker.internal:11434
+
+  # T1
+  - model_name: tier-1
+    litellm_params:
+      model: claude-sonnet-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+  - model_name: tier-1-gemini
+    litellm_params:
+      model: gemini/gemini-3-pro
+      api_key: os.environ/GEMINI_API_KEY
+
+  # T2
+  - model_name: tier-2
+    litellm_params:
+      model: claude-opus-4-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Uncensored / decentralized
+  - model_name: venice
+    litellm_params:
+      model: openai/llama-3.3-70b
+      api_base: https://api.venice.ai/api/v1
+      api_key: os.environ/VENICE_API_KEY
+  - model_name: hyperbolic
+    litellm_params:
+      model: openai/meta-llama/Llama-3.3-70B-Instruct
+      api_base: https://api.hyperbolic.xyz/v1
+      api_key: os.environ/HYPERBOLIC_API_KEY
+
+routing_strategy: simple-shuffle
+fallbacks:
+  - tier-1:
+      - tier-0
+  - tier-0:
+      - tier-0-classify

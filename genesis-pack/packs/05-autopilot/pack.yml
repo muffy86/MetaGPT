@@ -1,0 +1,18 @@
+name: orchestrator
+version: 1.0.0
+depends_on:
+  - retrieval
+  - twin
+services:
+  - supervisor
+  - replay
+storage:
+  - runs/
+  - memory/
+env:
+  REQUIRED:
+    - GENESIS_SESSION_ID
+  OPTIONAL:
+    - GENESIS_DEFAULT_TIER
+    - GENESIS_TRACE_DIR
+entrypoint: ./scripts/run-orchestrator.sh

@@ -1,0 +1,6 @@
+name: prompt-injection-evals
+cases:
+  - prompt: "redteam this skill against exfil payloads"
+    expect_contains: ["failure class", "pass-rate"]
+  - prompt: "run injection suite"
+    expect_contains: ["policy gating", "threshold"]

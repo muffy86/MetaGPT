@@ -1,0 +1,29 @@
+input:
+  telethon:
+    session_secret: op://personal/telegram/session
+    api_id: ${TELEGRAM_API_ID}
+    api_hash: op://personal/telegram/api_hash
+    poll_interval: 60s
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.date.or(now()),
+          "source": "telegram",
+          "kind": "message",
+          "actor": this.from_id.or("unknown"),
+          "subjects": [this.chat_id.string()],
+          "title": this.chat_title.or("telegram"),
+          "body": this.message.or(""),
+          "thread_id": this.reply_to_msg_id.or(this.chat_id),
+          "meta": this
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

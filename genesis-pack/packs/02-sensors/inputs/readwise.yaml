@@ -1,0 +1,32 @@
+input:
+  http_client:
+    url: https://readwise.io/api/v3/list/
+    headers:
+      Authorization: Token ${READWISE_KEY}
+    poll_interval: 30m
+pipeline:
+  processors:
+    - unarchive:
+        format: json_array
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": now().ts_unix(),
+          "source": "readwise",
+          "kind": "highlight",
+          "actor": this.author.or("unknown"),
+          "subjects": [this.title.or("untitled")],
+          "title": this.title.or("Readwise highlight"),
+          "body": this.text.or(""),
+          "body_hash": this.text.or("").hash("sha256"),
+          "meta": {
+            "url": this.url,
+            "location": this.location
+          }
+        }
+    - python:
+        script: packs/02-sensors/transforms/redact.py
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

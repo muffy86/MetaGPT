@@ -1,0 +1,32 @@
+input:
+  broker:
+    inputs:
+      - generate:
+          interval: "10m"
+          mapping: |
+            root = {"provider":"apple-health","mode":"export-watch"}
+      - generate:
+          interval: "15m"
+          mapping: |
+            root = {"provider":"oura","mode":"api-poll"}
+      - generate:
+          interval: "15m"
+          mapping: |
+            root = {"provider":"whoop","mode":"api-poll"}
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": now().ts_unix(),
+          "source": "health",
+          "kind": "metric",
+          "actor": "self",
+          "subjects": ["self"],
+          "title": this.provider + ":" + this.mode,
+          "body": "health sample",
+          "meta": {"provider": this.provider, "mode": this.mode}
+        }
+    - python: { script: "packs/02-sensors/transforms/redact.py" }
+    - python: { script: "packs/02-sensors/transforms/classify.py" }
+output: { iceberg: { catalog: data/exocortex, table: events } }

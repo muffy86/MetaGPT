@@ -1,0 +1,10 @@
+name: twin
+version: 1.0.0
+depends_on: [retrieval]
+services: [twin-api]
+ports: [8704]
+storage: [data/twin/]
+env:
+  REQUIRED: []
+  OPTIONAL: [TWIN_DEFAULT_MODEL, OLLAMA_BASE_URL]
+entrypoint: python packs/04-twin/api.py

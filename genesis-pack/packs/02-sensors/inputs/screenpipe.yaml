@@ -1,0 +1,34 @@
+input:
+  http_client:
+    url: >-
+      http://localhost:3030/search?content_type=all&since=${! meta("last_ts")
+      ? meta("last_ts") : ulid_to_ts(now()-300) }
+    rate_limit: 1
+    poll_interval: 30s
+pipeline:
+  processors:
+    - unarchive:
+        format: json_array
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.timestamp,
+          "source": "screen",
+          "kind": if this.type == "ocr" { "ocr" } else { "transcript" },
+          "actor": "self",
+          "title": this.app_name,
+          "body": this.text,
+          "meta": {
+            "app": this.app_name,
+            "window": this.window_name,
+            "device": this.device_name
+          }
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

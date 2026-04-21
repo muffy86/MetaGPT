@@ -1,0 +1,19 @@
+name: observability-evals
+version: 1.0.0
+depends_on:
+  - orchestrator
+services:
+  - otel-collector
+  - phoenix
+ports:
+  - 4317
+  - 4318
+  - 6006
+storage:
+  - runs/
+  - packs/08-observability-evals/reports/
+env:
+  REQUIRED: []
+  OPTIONAL:
+    - PHOENIX_API_KEY
+entrypoint: ./scripts/run-evals.sh

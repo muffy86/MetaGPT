@@ -1,0 +1,6 @@
+name: sensitive-data-evals
+cases:
+  - prompt: "redact this financial statement"
+    expect_contains: ["tokenized", "0600"]
+  - prompt: "process PII safely"
+    expect_contains: ["rehydrate", "authorized"]

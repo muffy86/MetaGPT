@@ -1,0 +1,6 @@
+name: code-review-evals
+cases:
+  - prompt: "review this PR for regressions"
+    expect_contains: ["severity", "line", "risk"]
+  - prompt: "audit this diff"
+    expect_contains: ["tests", "residual"]

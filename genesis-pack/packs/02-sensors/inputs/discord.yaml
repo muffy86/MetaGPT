@@ -1,0 +1,27 @@
+input:
+  discord:
+    bot_token: op://personal/discord/token
+    poll_interval: 90s
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.timestamp.or(now()),
+          "source": "discord",
+          "kind": "message",
+          "actor": this.author.username.or("unknown"),
+          "subjects": [this.channel_id.string()],
+          "title": this.guild_id.or("discord"),
+          "body": this.content.or(""),
+          "thread_id": this.thread_id.or(this.channel_id),
+          "meta": {"attachments": this.attachments}
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

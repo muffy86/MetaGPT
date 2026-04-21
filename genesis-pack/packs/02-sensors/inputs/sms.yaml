@@ -1,0 +1,37 @@
+input:
+  broker:
+    inputs:
+      - http_server:
+          path: /android/sms
+      - sql_select:
+          driver: sqlite
+          dsn: "file:${ANDROID_SMS_DB_PATH}?mode=ro"
+          query: |
+            SELECT _id, date/1000 as ts, address as actor, body
+            FROM sms
+            WHERE date > ?
+            ORDER BY date
+          args_mapping: root = [metadata("last_ts").or(0)]
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.ts.or(now()),
+          "source": "sms",
+          "kind": "message",
+          "actor": this.actor.or("unknown"),
+          "subjects": [this.actor.or("unknown")],
+          "title": "sms",
+          "body": this.body.or(this.text).or(""),
+          "thread_id": this.thread_id.or(this.actor),
+          "meta": {"transport": "android-kde-connect-or-db"}
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

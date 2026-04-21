@@ -1,0 +1,70 @@
+set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
+
+default: doctor
+
+profile value="linux-x64":
+	printf "%s\n" "{{value}}" > .profile
+	@echo "profile set to {{value}}"
+
+deps:
+	./packs/00-installer/deps.sh
+
+models:
+	./packs/00-installer/models.sh
+
+init-data:
+	./packs/00-installer/init-data.sh
+
+merge-fragments:
+	./packs/00-installer/merge-fragments.sh
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+pack-install:
+	./packs/00-installer/scripts/pack-install.sh
+
+doctor:
+	./packs/00-installer/doctor.sh
+
+doctor-mobile:
+	printf "android-termux\n" > .profile
+	./packs/00-installer/doctor.sh
+
+exo-init:
+	python3 packs/01-exocortex/init.py
+
+exo-stats:
+	python3 - <<'PY'
+import duckdb
+from pathlib import Path
+db = Path("data/ledger.duckdb")
+if not db.exists():
+    print("missing data/ledger.duckdb")
+    raise SystemExit(2)
+con = duckdb.connect(str(db), read_only=True)
+rows = con.execute("SELECT source, COUNT(*) AS n FROM exocortex.events GROUP BY 1 ORDER BY n DESC").fetchall()
+for source, n in rows:
+    print(f"{source}\t{n}")
+PY
+
+sensor-enable name:
+	python3 packs/02-sensors/scripts/toggle_sensor.py enable {{name}}
+
+sensor-disable name:
+	python3 packs/02-sensors/scripts/toggle_sensor.py disable {{name}}
+
+replay session:
+	python3 packs/05-autopilot/replay.py runs/{{session}}/trace.jsonl
+
+eval-all:
+	./packs/07-lab/scripts/run-all-evals.sh
+
+opa-test:
+	opa test assets/policies.rego
+
+completion-check:
+	python3 scripts/completion_check.py

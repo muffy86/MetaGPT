@@ -1,0 +1,23 @@
+name: sensors
+version: 1.0.0
+depends_on:
+  - exocortex
+services:
+  - redpanda-connect
+ports:
+  - 8880
+storage:
+  - data/sensors/state/
+env:
+  REQUIRED:
+    - OP_SERVICE_ACCOUNT_TOKEN
+  OPTIONAL:
+    - GMAIL_OAUTH
+    - SLACK_BOT_TOKEN
+    - GH_TOKEN
+    - LINEAR_KEY
+    - READWISE_KEY
+    - PLAID_SECRET
+    - OURA_TOKEN
+    - WHOOP_TOKEN
+entrypoint: ./scripts/enable-defaults.sh

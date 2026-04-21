@@ -1,0 +1,9 @@
+providers:
+  - name: layerzero-v2
+    role: messaging
+  - name: chainlink-ccip
+    role: oracle-messaging
+  - name: debridge
+    role: bridge
+  - name: near-mpc
+    role: chain-signatures

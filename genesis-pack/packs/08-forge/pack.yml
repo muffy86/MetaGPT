@@ -1,0 +1,16 @@
+name: policy-security
+version: 1.0.0
+depends_on:
+  - orchestrator
+services:
+  - opa
+  - secrets-resolver
+storage:
+  - data/policies/
+  - runs/policy/
+env:
+  REQUIRED:
+    - OP_SERVICE_ACCOUNT_TOKEN
+  OPTIONAL:
+    - OPA_BUNDLE_PATH
+entrypoint: ./scripts/check-policy.sh

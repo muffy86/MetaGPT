@@ -1,0 +1,6 @@
+name: financial-iq-evals
+cases:
+  - prompt: "calculate monthly burn and runway"
+    expect_contains: ["Decimal", "citations"]
+  - prompt: "detect spending anomalies"
+    expect_contains: ["z-score", "90-day"]

@@ -1,0 +1,33 @@
+input:
+  gmail:
+    oauth_secret: op://personal/gmail-oauth/json
+    query: "newer_than:7d OR is:unread"
+    poll_interval: 60s
+    include_attachments: false
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.internal_date.parse_timestamp_unix_milli() / 1000,
+          "source": "gmail",
+          "kind": "message",
+          "actor": this.from,
+          "subjects": this.to.or([]).concat(this.cc.or([])),
+          "title": this.subject,
+          "body": this.body_text,
+          "body_hash": this.body_text.hash("sha256"),
+          "thread_id": this.thread_id,
+          "meta": {
+            "labels": this.labels,
+            "has_attachments": this.has_attachments
+          }
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

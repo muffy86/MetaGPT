@@ -1,0 +1,5 @@
+name: interface
+version: 1.0.0
+depends_on: [retrieval, twin, autopilot]
+services: [gx]
+entrypoint: ./gx.sh

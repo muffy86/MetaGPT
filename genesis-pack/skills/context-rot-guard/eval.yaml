@@ -1,0 +1,6 @@
+name: context-rot-evals
+cases:
+  - prompt: "compact this run"
+    expect_contains: ["active plan", "pointer"]
+  - prompt: "refocus on objective"
+    expect_contains: ["constraints", "unresolved"]

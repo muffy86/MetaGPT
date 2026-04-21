@@ -1,0 +1,18 @@
+name: web3-frontier
+version: 1.0.0
+depends_on:
+  - orchestrator
+services:
+  - adapter-registry
+storage:
+  - data/web3/
+env:
+  REQUIRED:
+    - OP_SERVICE_ACCOUNT_TOKEN
+  OPTIONAL:
+    - CDP_API_KEY_NAME
+    - CDP_API_KEY_PRIVATE_KEY
+    - GOAT_API_KEY
+    - NEAR_ACCOUNT_ID
+    - NEAR_PRIVATE_KEY
+entrypoint: ./scripts/bootstrap-adapters.sh

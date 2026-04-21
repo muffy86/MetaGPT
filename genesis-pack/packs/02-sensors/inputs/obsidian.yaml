@@ -1,0 +1,31 @@
+input:
+  file_watcher:
+    paths:
+      - "${OBSIDIAN_VAULT_PATH}"
+    include_patterns:
+      - "**/*.md"
+    poll_interval: 20s
+pipeline:
+  processors:
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.mod_time.or(now()),
+          "source": "obsidian",
+          "kind": "note",
+          "actor": "self",
+          "subjects": [this.path],
+          "title": this.path.split("/").index(-1),
+          "body": this.content.or(""),
+          "meta": {"path": this.path, "vault": "${OBSIDIAN_VAULT_PATH}"}
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+    - python:
+        script: "packs/02-sensors/transforms/extract.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

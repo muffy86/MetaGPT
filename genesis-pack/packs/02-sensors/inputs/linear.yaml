@@ -1,0 +1,42 @@
+input:
+  broker:
+    inputs:
+      - http_server:
+          path: /webhook/linear
+      - generate:
+          interval: 1h
+          mapping: root = {}
+pipeline:
+  processors:
+    - switch:
+        - check: 'meta("Http-Linear-Signature") != null'
+          processors:
+            - mapping: root = this
+        - processors:
+            - command:
+                name: curl
+                args_mapping: >-
+                  ["-s","https://api.linear.app/graphql",
+                   "-H","Authorization: ${LINEAR_KEY}",
+                   "-H","Content-Type: application/json",
+                   "-d","{\"query\":\"{viewer{id}}\"}"]
+    - mapping: |
+        root = {
+          "id": uuid_v7(),
+          "ts": this.createdAt.or(now()),
+          "source": "linear",
+          "kind": this.action.or("event"),
+          "actor": this.actor.email.or("linear"),
+          "subjects": [this.data.issue.identifier.or("linear")],
+          "title": this.data.issue.title.or("linear event"),
+          "body": this.data.issue.description.or(""),
+          "meta": this
+        }
+    - python:
+        script: "packs/02-sensors/transforms/redact.py"
+    - python:
+        script: "packs/02-sensors/transforms/classify.py"
+output:
+  iceberg:
+    catalog: data/exocortex
+    table: events

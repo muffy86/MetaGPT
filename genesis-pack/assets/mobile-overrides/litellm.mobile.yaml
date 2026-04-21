@@ -1,0 +1,20 @@
+model_list:
+  - model_name: planner
+    litellm_params:
+      model: ollama/qwen3-coder:7b
+      api_base: http://localhost:11434
+      timeout: 20
+  - model_name: agent-default
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5
+      api_base: http://localhost:4000
+  - model_name: agent-untrusted
+    litellm_params:
+      model: anthropic/claude-opus-4-5
+      api_base: http://localhost:4000
+
+router_settings:
+  routing_strategy: simple-shuffle
+  fallbacks:
+    - agent-default:
+        - planner

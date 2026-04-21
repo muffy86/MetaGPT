@@ -1,0 +1,71 @@
+name: genesis
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment: [POSTGRES_PASSWORD=dev, POSTGRES_DB=langgraph]
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    command: [postgres, -c, max_connections=200, -c, shared_buffers=512MB]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: [redis-server, --maxmemory, 2gb, --maxmemory-policy, allkeys-lru]
+
+  mcp-gateway:
+    image: ghcr.io/mcp-proxy/mcp-proxy:latest
+    ports: ["18789:18789"]
+    volumes: ["./assets/mcp-config.yaml:/config.yaml:ro"]
+    environment: [OPA_URL=http://opa:8181]
+
+  opa:
+    image: openpolicyagent/opa:latest
+    command: [run, --server, --addr=0.0.0.0:8181, /policies]
+    volumes: ["./assets/policies.rego:/policies/policies.rego:ro"]
+    ports: ["8181:8181"]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel.yaml"]
+    volumes: ["./assets/otel-collector.yaml:/etc/otel.yaml:ro"]
+    ports: ["4317:4317", "4318:4318"]
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports: ["6006:6006"]
+    volumes: [phoenix:/mnt/phoenix]
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    ports: ["4000:4000"]
+    volumes: ["./assets/litellm.yaml:/app/config.yaml:ro"]
+    command: ["--config", "/app/config.yaml"]
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      VENICE_API_KEY: ${VENICE_API_KEY}
+      HYPERBOLIC_API_KEY: ${HYPERBOLIC_API_KEY}
+
+  inngest:
+    image: inngest/inngest:latest
+    ports: ["8288:8288"]
+    command: [inngest, dev, --port, "8288", "--host", "0.0.0.0"]
+
+  redpanda-connect:
+    image: docker.redpanda.com/redpandadata/connect:latest
+    ports: ["8880:8880"]
+    volumes: ["./packs/02-sensors:/pipelines:ro", "./data/sensors/state:/state"]
+    command: [connect, run, "--log.level=INFO", /pipelines/enabled/*.yaml]
+
+  screenpipe:
+    image: mediar/screenpipe:latest
+    ports: ["3030:3030"]
+    volumes: [screenpipe:/data]
+    privileged: true
+    profiles: [desktop]
+
+volumes:
+  pgdata: {}
+  phoenix: {}
+  screenpipe: {}
