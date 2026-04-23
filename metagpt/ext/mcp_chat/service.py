@@ -11,7 +11,7 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, AsyncIterator, Awaitable, Callable, Dict, List, Optional, Sequence, Tuple
 
 import aiohttp
 import yaml
@@ -123,6 +123,45 @@ def parse_skill_command(message: str) -> Tuple[Optional[str], Dict[str, Any]]:
 class ModelClient:
     label: str
     llm: Any
+
+
+class EventBroker:
+    """Fan-out event broker used by SSE and bridge transports."""
+
+    def __init__(self, max_queue_size: int = 256):
+        self.max_queue_size = max_queue_size
+        self._subscribers: Dict[int, Tuple[Optional[str], asyncio.Queue]] = {}
+        self._next_subscription_id = 1
+        self._lock = asyncio.Lock()
+
+    async def subscribe(self, session_id: Optional[str] = None) -> Tuple[int, asyncio.Queue]:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=self.max_queue_size)
+        async with self._lock:
+            subscription_id = self._next_subscription_id
+            self._next_subscription_id += 1
+            self._subscribers[subscription_id] = (session_id, queue)
+        return subscription_id, queue
+
+    async def unsubscribe(self, subscription_id: int) -> None:
+        async with self._lock:
+            self._subscribers.pop(subscription_id, None)
+
+    async def publish(self, event: Dict[str, Any]) -> None:
+        async with self._lock:
+            subscribers = list(self._subscribers.items())
+        for _, (session_filter, queue) in subscribers:
+            if session_filter and session_filter != event.get("session"):
+                continue
+            if queue.full():
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                # Drop event if queue remains full after one eviction.
+                continue
 
 
 class MultiModelChatEngine:
@@ -240,6 +279,7 @@ class MCPChatService:
         declared_skill_names: Optional[Sequence[str]] = None,
         max_message_chars: int = 8000,
         skill_runner: Optional[Callable[[str, Dict[str, Any]], Awaitable[str]]] = None,
+        event_broker: Optional[EventBroker] = None,
     ):
         self.engine = engine
         self.sessions = session_store or SessionStore()
@@ -248,6 +288,7 @@ class MCPChatService:
         self.max_message_chars = max_message_chars
         self.declared_skill_names = set(declared_skill_names or [])
         self._skill_runner = skill_runner or self._default_skill_runner
+        self.events = event_broker or EventBroker()
 
     async def _default_skill_runner(self, skill_name: str, args: Dict[str, Any]) -> str:
         from metagpt.actions.skill_action import SkillAction
@@ -296,6 +337,16 @@ class MCPChatService:
                 "metadata": metadata or {},
             },
         )
+        await self.events.publish(
+            {
+                "type": "chat.completed",
+                "session": session_id,
+                "source": source,
+                "message": clean_message,
+                "response": answer,
+                "metadata": metadata or {},
+            }
+        )
 
         return {
             "session": session_id,
@@ -315,4 +366,116 @@ class MCPChatService:
             event="mcp.event.ingested",
             payload={"session": session_id, "event": event, "payload": payload},
         )
+        await self.events.publish(
+            {
+                "type": "mcp.event.ingested",
+                "session": session_id,
+                "event": event,
+                "payload": payload,
+            }
+        )
         return {"status": "accepted", "session": session_id, "event": event}
+
+    async def open_event_subscription(self, session_id: Optional[str] = None) -> Tuple[int, asyncio.Queue]:
+        return await self.events.subscribe(session_id=session_id)
+
+    async def close_event_subscription(self, subscription_id: int) -> None:
+        await self.events.unsubscribe(subscription_id)
+
+    def list_mcp_tools(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "name": "chat.send",
+                "description": "Send a chat message to a session.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "session": {"type": "string"},
+                        "message": {"type": "string"},
+                        "preferred_models": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["message"],
+                },
+            },
+            {
+                "name": "chat.snapshot",
+                "description": "Fetch chat history for a session.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"session": {"type": "string"}},
+                },
+            },
+            {
+                "name": "mcp.event.ingest",
+                "description": "Ingest an MCP event into session memory.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "session": {"type": "string"},
+                        "event": {"type": "string"},
+                        "payload": {"type": "object"},
+                    },
+                    "required": ["event", "payload"],
+                },
+            },
+        ]
+
+    async def call_mcp_tool(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        args = arguments or {}
+        if not isinstance(args, dict):
+            raise ValueError("Tool arguments must be a JSON object")
+
+        if name == "chat.send":
+            message = args.get("message")
+            if not isinstance(message, str):
+                raise ValueError("chat.send requires string argument `message`")
+            session_id = str(args.get("session", "main"))
+            preferred_models = args.get("preferred_models")
+            if preferred_models is not None and not isinstance(preferred_models, list):
+                raise ValueError("chat.send preferred_models must be an array of strings")
+            return await self.chat(
+                session_id=session_id,
+                message=message,
+                preferred_models=preferred_models,
+                metadata={"transport": "mcp-tool"},
+            )
+
+        if name == "chat.snapshot":
+            session_id = str(args.get("session", "main"))
+            return await self.session_snapshot(session_id)
+
+        if name == "mcp.event.ingest":
+            event = args.get("event")
+            payload = args.get("payload")
+            if not isinstance(event, str) or not event:
+                raise ValueError("mcp.event.ingest requires non-empty string argument `event`")
+            if not isinstance(payload, dict):
+                raise ValueError("mcp.event.ingest requires object argument `payload`")
+            session_id = str(args.get("session", "main"))
+            return await self.ingest_mcp_event(session_id=session_id, event=event, payload=payload)
+
+        raise ValueError(f"Unknown tool '{name}'")
+
+    async def stream_chat_completion_chunks(
+        self,
+        session_id: str,
+        message: str,
+        preferred_models: Optional[Sequence[str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        chunk_size: int = 64,
+    ) -> AsyncIterator[Tuple[str, str, bool]]:
+        result = await self.chat(
+            session_id=session_id,
+            message=message,
+            preferred_models=preferred_models,
+            metadata=metadata,
+        )
+        text = result["response"]
+        source = result["source"]
+        if not text:
+            yield "", source, True
+            return
+        size = max(1, chunk_size)
+        for ix in range(0, len(text), size):
+            yield text[ix : ix + size], source, False
+        yield "", source, True

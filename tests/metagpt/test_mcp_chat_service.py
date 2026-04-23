@@ -115,3 +115,46 @@ async def test_service_skill_allowlist():
 
     with pytest.raises(ValueError):
         await service.chat(session_id="s1", message="/skill unknown_skill {}")
+
+
+@pytest.mark.asyncio
+async def test_stream_chat_completion_chunks():
+    engine = MultiModelChatEngine(
+        clients=[ModelClient(label="stub", llm=_StubLLM(response="abcdefghij"))]
+    )
+    service = MCPChatService(engine=engine)
+    chunks = []
+    async for chunk, source, is_final in service.stream_chat_completion_chunks(
+        session_id="stream-session",
+        message="stream this",
+        chunk_size=3,
+    ):
+        chunks.append((chunk, source, is_final))
+
+    text_chunks = [c[0] for c in chunks if c[0]]
+    assert "".join(text_chunks) == "abcdefghij"
+    assert chunks[-1][2] is True
+    assert chunks[-1][1] == "stub"
+
+
+@pytest.mark.asyncio
+async def test_mcp_tool_list_and_call():
+    engine = MultiModelChatEngine(
+        clients=[ModelClient(label="stub", llm=_StubLLM(response="tool-reply"))]
+    )
+    service = MCPChatService(engine=engine)
+
+    tools = service.list_mcp_tools()
+    assert any(tool["name"] == "chat.send" for tool in tools)
+    assert any(tool["name"] == "chat.snapshot" for tool in tools)
+    assert any(tool["name"] == "mcp.event.ingest" for tool in tools)
+
+    sent = await service.call_mcp_tool(
+        "chat.send",
+        {"session": "tool-main", "message": "hello via tool"},
+    )
+    assert sent["response"] == "tool-reply"
+
+    snap = await service.call_mcp_tool("chat.snapshot", {"session": "tool-main"})
+    assert snap["session"] == "tool-main"
+    assert len(snap["history"]) == 2

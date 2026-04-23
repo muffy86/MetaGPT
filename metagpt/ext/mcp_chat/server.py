@@ -4,9 +4,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import os
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -266,8 +269,6 @@ async def chat_completions(request: web.Request) -> web.Response:
         return _json_error("Invalid JSON body")
     if not isinstance(body, dict):
         return _json_error("Body must be a JSON object")
-    if body.get("stream"):
-        return _json_error("stream=true is not supported on this endpoint yet", status=400)
 
     messages = body.get("messages", [])
     if not isinstance(messages, list) or not messages:
@@ -289,6 +290,60 @@ async def chat_completions(request: web.Request) -> web.Response:
         preferred_models = body["preferred_models"]
 
     session_id = str(body.get("session", "main"))
+    stream = bool(body.get("stream"))
+
+    if stream:
+        stream_response = web.StreamResponse(
+            status=200,
+            headers={
+                "Content-Type": "text/event-stream",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        )
+        await stream_response.prepare(request)
+
+        now_ts = int(time.time())
+        completion_id = f"chatcmpl-{now_ts}-{uuid.uuid4().hex[:8]}"
+
+        try:
+            async for chunk, source, is_final in service.stream_chat_completion_chunks(
+                session_id=session_id,
+                message=user_message,
+                preferred_models=preferred_models,
+                metadata={"endpoint": "/v1/chat/completions", "client_ip": request.remote, "stream": True},
+            ):
+                if is_final:
+                    payload = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": now_ts,
+                        "model": source,
+                        "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                    }
+                else:
+                    payload = {
+                        "id": completion_id,
+                        "object": "chat.completion.chunk",
+                        "created": now_ts,
+                        "model": source,
+                        "choices": [{"index": 0, "delta": {"content": chunk}, "finish_reason": None}],
+                    }
+                await stream_response.write(f"data: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8"))
+            await stream_response.write(b"data: [DONE]\n\n")
+        except ValueError as exc:
+            err = {"error": {"message": str(exc), "type": "invalid_request_error"}}
+            await stream_response.write(f"data: {json.dumps(err, ensure_ascii=False)}\n\n".encode("utf-8"))
+            await stream_response.write(b"data: [DONE]\n\n")
+        except RuntimeError as exc:
+            err = {"error": {"message": str(exc), "type": "service_unavailable"}}
+            await stream_response.write(f"data: {json.dumps(err, ensure_ascii=False)}\n\n".encode("utf-8"))
+            await stream_response.write(b"data: [DONE]\n\n")
+        finally:
+            await stream_response.write_eof()
+
+        return stream_response
+
     try:
         result = await service.chat(
             session_id=session_id,
@@ -352,6 +407,181 @@ async def mcp_events(request: web.Request) -> web.Response:
     return web.json_response(result, status=202)
 
 
+def _mcp_response(req_id: Any, result: Any) -> Dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+
+def _mcp_error(req_id: Any, code: int, message: str) -> Dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
+
+
+async def _handle_mcp_rpc_single(service: MCPChatService, request_obj: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    req_id = request_obj.get("id")
+    method = request_obj.get("method")
+    params = request_obj.get("params", {})
+
+    if request_obj.get("jsonrpc") != "2.0":
+        return _mcp_error(req_id, -32600, "Invalid Request: jsonrpc must be '2.0'")
+    if not isinstance(method, str) or not method:
+        return _mcp_error(req_id, -32600, "Invalid Request: method must be non-empty string")
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        return _mcp_error(req_id, -32602, "Invalid params: expected object")
+
+    # Notifications do not include an id and should not produce a response.
+    is_notification = req_id is None
+
+    try:
+        if method == "initialize":
+            result = {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {"name": "metagpt-mcp-chat", "version": "0.1.0"},
+                "capabilities": {"tools": {"listChanged": False}},
+            }
+            return None if is_notification else _mcp_response(req_id, result)
+
+        if method in {"ping"}:
+            return None if is_notification else _mcp_response(req_id, {})
+
+        if method in {"tools/list", "tools.list"}:
+            result = {"tools": service.list_mcp_tools()}
+            return None if is_notification else _mcp_response(req_id, result)
+
+        if method in {"tools/call", "tools.call"}:
+            name = params.get("name")
+            arguments = params.get("arguments", {})
+            if not isinstance(name, str) or not name:
+                return _mcp_error(req_id, -32602, "Invalid params: `name` must be non-empty string")
+            if not isinstance(arguments, dict):
+                return _mcp_error(req_id, -32602, "Invalid params: `arguments` must be object")
+            tool_result = await service.call_mcp_tool(name=name, arguments=arguments)
+            result = {"content": [{"type": "text", "text": json.dumps(tool_result, ensure_ascii=False)}], "isError": False}
+            return None if is_notification else _mcp_response(req_id, result)
+
+        if method in {"events/subscribe", "events.subscribe"}:
+            session_id = params.get("session")
+            if session_id is not None and not isinstance(session_id, str):
+                return _mcp_error(req_id, -32602, "Invalid params: `session` must be string")
+            query = f"?session={session_id}" if session_id else ""
+            result = {"streamUrl": f"/v1/mcp/events/stream{query}"}
+            return None if is_notification else _mcp_response(req_id, result)
+
+        return _mcp_error(req_id, -32601, f"Method not found: {method}")
+    except ValueError as exc:
+        return _mcp_error(req_id, -32602, str(exc))
+    except Exception as exc:
+        return _mcp_error(req_id, -32000, f"Server error: {exc}")
+
+
+async def mcp_rpc(request: web.Request) -> web.Response:
+    service: MCPChatService = request.app["chat_service"]
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        return web.json_response(_mcp_error(None, -32700, "Parse error"), status=400)
+
+    if isinstance(payload, list):
+        responses: List[Dict[str, Any]] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                responses.append(_mcp_error(None, -32600, "Invalid Request"))
+                continue
+            resp = await _handle_mcp_rpc_single(service, item)
+            if resp is not None:
+                responses.append(resp)
+        if not responses:
+            return web.Response(status=204)
+        return web.json_response(responses)
+
+    if not isinstance(payload, dict):
+        return web.json_response(_mcp_error(None, -32600, "Invalid Request"), status=400)
+
+    resp = await _handle_mcp_rpc_single(service, payload)
+    if resp is None:
+        return web.Response(status=204)
+    return web.json_response(resp)
+
+
+async def mcp_events_stream(request: web.Request) -> web.StreamResponse:
+    service: MCPChatService = request.app["chat_service"]
+    session_filter = request.query.get("session")
+    if session_filter == "":
+        session_filter = None
+    max_events_raw = request.query.get("max_events")
+    max_events: Optional[int] = None
+    if max_events_raw:
+        try:
+            parsed = int(max_events_raw)
+            if parsed > 0:
+                max_events = parsed
+        except ValueError:
+            max_events = None
+
+    subscription_id, queue = await service.open_event_subscription(session_id=session_filter)
+    response = web.StreamResponse(
+        status=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+    await response.prepare(request)
+    emitted = 0
+    try:
+        ready_payload = {"type": "mcp.stream.ready", "session": session_filter}
+        await response.write(f"data: {json.dumps(ready_payload, ensure_ascii=False)}\n\n".encode("utf-8"))
+        emitted += 1
+        if max_events is not None and emitted >= max_events:
+            return response
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=25.0)
+                await response.write(f"data: {json.dumps(event, ensure_ascii=False)}\n\n".encode("utf-8"))
+                emitted += 1
+                if max_events is not None and emitted >= max_events:
+                    break
+            except asyncio.TimeoutError:
+                await response.write(b": keepalive\n\n")
+    except (asyncio.CancelledError, ConnectionResetError):
+        pass
+    finally:
+        await service.close_event_subscription(subscription_id)
+        with contextlib.suppress(ConnectionResetError):
+            await response.write_eof()
+    return response
+
+
+async def mcp_stdio(request: web.Request) -> web.Response:
+    """Line-delimited JSON-RPC over HTTP for stdio-style MCP clients."""
+    service: MCPChatService = request.app["chat_service"]
+    raw = await request.text()
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if not lines:
+        return web.Response(text="", content_type="application/x-ndjson")
+
+    responses: List[Dict[str, Any]] = []
+    for line in lines:
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            responses.append(_mcp_error(None, -32700, "Parse error"))
+            continue
+        if not isinstance(obj, dict):
+            responses.append(_mcp_error(None, -32600, "Invalid Request"))
+            continue
+        resp = await _handle_mcp_rpc_single(service, obj)
+        if resp is not None:
+            responses.append(resp)
+
+    if not responses:
+        return web.Response(text="", content_type="application/x-ndjson")
+
+    payload = "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in responses)
+    return web.Response(text=payload, content_type="application/x-ndjson")
+
+
 def create_app(
     settings: Optional[MCPChatSettings] = None,
     service_override: Optional[MCPChatService] = None,
@@ -370,6 +600,9 @@ def create_app(
             web.post("/chat", chat_post),
             web.post("/v1/chat/completions", chat_completions),
             web.post("/v1/mcp/events", mcp_events),
+            web.post("/v1/mcp/rpc", mcp_rpc),
+            web.post("/v1/mcp/stdio", mcp_stdio),
+            web.get("/v1/mcp/events/stream", mcp_events_stream),
         ]
     )
     return app
